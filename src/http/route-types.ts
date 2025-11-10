@@ -10,6 +10,9 @@ import type { RouteGenericInterface } from 'fastify';
 import type { Union } from '../util/immutable';
 
 // biome-ignore lint/style/useNamingConvention: Fastify's RouteGenericInterface requires PascalCase property names
+export type WithQuerystring<T> = Pick<RouteGenericInterface, 'Querystring'> & { Querystring: T };
+
+// biome-ignore lint/style/useNamingConvention: Fastify's RouteGenericInterface requires PascalCase property names
 export type WithParams<T> = Pick<RouteGenericInterface, 'Params'> & { Params: T };
 
 // biome-ignore lint/style/useNamingConvention: Fastify's RouteGenericInterface requires PascalCase property names

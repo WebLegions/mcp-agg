@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { type Infer, z } from '../lib/validator';
-import type { WithBody } from './route-types';
+import type { WithBody, WithQuerystring } from './route-types';
 
 /**
  * IETF BCP 47 locale pattern
@@ -16,14 +16,14 @@ const COMMON_LOCALES = [
     'en-US',
     'en-GB',
     'de-DE',
-    'fr-FR',
-    'es-ES',
-    'it-IT',
+    'fr',
+    'es',
+    'it',
     'ja-JP',
     'zh-CN',
     'ko-KR',
     'pt-BR',
-    'ru-RU',
+    'ru',
     'ar-SA',
     'ar-EG',
     'he-IL',
@@ -36,13 +36,13 @@ const COMMON_LOCALES = [
  * - number: 1-15 digits, positive or negative
  * - locale: IETF BCP 47 format (e.g., en-US)
  */
-const numberFormatSchema = {
+const numberFormatSchema = z.object({
     number: z.number().describe('Number to format (1-15 digits, can be positive or negative)'),
     locale: z
         .string()
         .regex(IETF_BCP47_PATTERN, 'Locale must be in IETF BCP 47 format (e.g., en-US)')
         .describe('Locale in IETF BCP 47 format (e.g., en-US, de-DE)'),
-};
+});
 
 type NumberFormatRequest = Infer<typeof numberFormatSchema>;
 
@@ -70,8 +70,44 @@ function isLocaleSupported(locale: string): boolean {
 }
 
 /**
- * Register number formatting endpoint
+ * Shared handler logic for formatting numbers
+ */
+async function formatNumber(number: number, locale: string, reply: FastifyReply) {
+    // Validate number has max 15 digits
+    if (!hasMaxDigits(number, 15)) {
+        return reply.status(400).send({
+            message: 'Number must have at most 15 digits',
+        });
+    }
+
+    // Check if locale is supported
+    if (!isLocaleSupported(locale)) {
+        return reply.status(400).send({
+            message: `Unsupported locale: ${locale}`,
+            availableLocales: COMMON_LOCALES,
+        });
+    }
+
+    // Format the number using Intl.NumberFormat
+    try {
+        const loc = new Intl.NumberFormat(locale);
+        const formatted = loc.format(number);
+
+        return {
+            formatted,
+        };
+    } catch (error) {
+        return reply.status(400).send({
+            message: `Failed to format number: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            availableLocales: COMMON_LOCALES,
+        });
+    }
+}
+
+/**
+ * Register number formatting endpoints
  *
+ * GET /hello?number=123456789&locale=en-US
  * POST /hello
  * {
  *   "number": 123456789,
@@ -90,54 +126,49 @@ function isLocaleSupported(locale: string): boolean {
  * }
  */
 export function registerHello(app: FastifyInstance) {
+    const responseSchema = {
+        200: z.object({
+            formatted: z.string().describe('Formatted number string'),
+        }),
+        400: z.object({
+            message: z.string().describe('Error message'),
+            availableLocales: z.array(z.string()).optional().describe('List of commonly available locales'),
+        }),
+    };
+
+    // GET endpoint with query parameters
+    app.get<WithQuerystring<NumberFormatRequest>>(
+        '/api/v1/hello',
+        {
+            schema: {
+                summary: 'Format a number according to locale',
+                description: 'Formats a number using Intl.NumberFormat with the specified locale',
+                tags: ['API Example'],
+                querystring: numberFormatSchema,
+                response: responseSchema,
+            },
+        },
+        async (request: FastifyRequest<WithQuerystring<NumberFormatRequest>>, reply: FastifyReply) => {
+            const { number, locale } = request.query;
+            return formatNumber(number, locale, reply);
+        },
+    );
+
+    // POST endpoint with JSON body
     app.post<WithBody<NumberFormatRequest>>(
         '/api/v1/hello',
         {
             schema: {
+                summary: 'Format a number according to locale (JSON body)',
+                description: 'Formats a number using Intl.NumberFormat with the specified locale',
+                tags: ['API Example'],
                 body: numberFormatSchema,
-                response: {
-                    200: {
-                        formatted: z.string().describe('Formatted number string'),
-                    },
-                    400: {
-                        message: z.string().describe('Error message'),
-                        availableLocales: z.array(z.string()).optional().describe('List of commonly available locales'),
-                    },
-                },
+                response: responseSchema,
             },
         },
         async (request: FastifyRequest<WithBody<NumberFormatRequest>>, reply: FastifyReply) => {
             const { number, locale } = request.body;
-
-            // Validate number has max 15 digits
-            if (!hasMaxDigits(number, 15)) {
-                return reply.status(400).send({
-                    message: 'Number must have at most 15 digits',
-                });
-            }
-
-            // Check if locale is supported
-            if (!isLocaleSupported(locale)) {
-                return reply.status(400).send({
-                    message: `Unsupported locale: ${locale}`,
-                    availableLocales: COMMON_LOCALES,
-                });
-            }
-
-            // Format the number using Intl.NumberFormat
-            try {
-                const loc = new Intl.NumberFormat(locale);
-                const formatted = loc.format(number);
-
-                return {
-                    formatted,
-                };
-            } catch (error) {
-                return reply.status(400).send({
-                    message: `Failed to format number: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                    availableLocales: COMMON_LOCALES,
-                });
-            }
+            return formatNumber(number, locale, reply);
         },
     );
 }

@@ -121,7 +121,7 @@ describe('app', () => {
 
         strictEqual(response.statusCode, 200, 'Should return 200 status code');
         ok(response.headers['content-type']?.includes('text/html'), 'Should return HTML content type');
-        ok(response.body.includes('swagger-ui'), 'Should contain Swagger UI HTML');
+        ok(response.body.includes('api-reference'), 'Should contain Scalar API Reference HTML');
     });
 
     test('GET /api/v1/openapi.json returns OpenAPI spec', async () => {

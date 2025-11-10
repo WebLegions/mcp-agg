@@ -214,6 +214,11 @@ function parseSchema(schema: Schema, refs: Refs): JsonSchema {
  * Parse a single validator - converts ValidatorDef to JsonSchema by omitting metadata
  */
 function parseValidator(validator: Validator, refs: Refs): JsonSchema {
+    // Check if validator has defs method
+    if (!validator || typeof validator !== 'object' || !('defs' in validator) || typeof validator.defs !== 'function') {
+        throw new Error(`Invalid validator: expected object with defs() method, got ${typeof validator}`);
+    }
+
     // Use def() method which returns ValidatorDef
     const def = validator.defs(refs.options.additionalProperties);
 

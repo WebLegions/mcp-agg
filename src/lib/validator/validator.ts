@@ -123,7 +123,7 @@ export abstract class TypeV<T> implements Validator<T> {
     protected _inner?: Validator; // Optional inner validator for composite types
     protected _defs: Partial<ValidatorDef> = {}; // Track constraint metadata for schema generation
 
-    defs(): ValidatorDef {
+    defs(_props?: boolean): ValidatorDef {
         return { ...this._defs };
     }
 

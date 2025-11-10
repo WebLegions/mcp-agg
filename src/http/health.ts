@@ -3,6 +3,15 @@ import { getCluster } from '../cluster';
 import { z } from '../lib/validator';
 
 /**
+ * Response schema for health endpoint
+ */
+const healthResponseSchema = z.object({
+    status: z.string().describe('Health status'),
+    timestamp: z.string().describe('Current server timestamp in ISO 8601 format'),
+    workers: z.number().optional().describe('Number of active worker processes (only in cluster mode)'),
+});
+
+/**
  * Register health check endpoint
  * Returns status, timestamp, and worker count (if in cluster mode)
  */
@@ -11,19 +20,16 @@ export function registerHealth(app: FastifyInstance) {
         '/health',
         {
             schema: {
-                description: 'Health check endpoint',
-                tags: ['monitoring'],
+                summary: 'Health check endpoint',
+                description: 'Returns server health status and timestamp',
+                tags: ['Monitoring'],
                 response: {
-                    200: {
-                        status: z.string(),
-                        timestamp: z.string(),
-                        workers: z.number().optional(),
-                    },
+                    200: healthResponseSchema,
                 },
             },
         },
         async () => {
-            const workers = getCluster()?.getStats().activeWorkers;
+            const workers = getCluster()?.getStats().activeWorkers ?? 0;
             return {
                 status: 'ok',
                 timestamp: new Date().toISOString(),

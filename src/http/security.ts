@@ -9,13 +9,21 @@ import { Env } from '../util/env';
  * Sets security-related HTTP headers (CSP, HSTS, X-Frame-Options, etc.)
  */
 async function registerHelmet(app: FastifyInstance) {
+    const isDev = Env.nodeEnv === 'development';
+    const port = process.env.PORT ?? 3000;
+
     await app.register(helmet, {
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
-                styleSrc: ["'self'", "'unsafe-inline'"],
-                scriptSrc: ["'self'"],
+                // In development, allow localhost for API testing from Scalar UI
+                connectSrc: isDev ? ["'self'", `http://localhost:${port}`, `ws://localhost:${port}`] : ["'self'"],
+                // Scalar API Reference from jsdelivr CDN
+                styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+                scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+                scriptSrcElem: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
                 imgSrc: ["'self'", 'data:', 'https:'],
+                fontSrc: ["'self'", 'data:', 'https://cdn.jsdelivr.net'],
             },
         },
         hsts: {

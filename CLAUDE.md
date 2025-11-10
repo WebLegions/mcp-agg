@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Coding patterns
 
 - Code assumes Bun >= 1.03 with Node.js API >= v24 (see package.json engine field). Always prefer to use latest native APIs.
-- tsconfig: Module=ESNext; Resolution=bundler; Strict mode; Source maps enabled for better debugging.
+- tsconfig: Module=ESNext; Resolution=bundler; Strict mode; Source maps enabled for better debugging. always noEmit.
 - Do not use imports from "bun:*" namespaces and Bun-specific globals. We keep strict adherence with Node.js >=24 APIs for backwards compatibility of the project codebase.
 - Never use `null` in the code >> use `undefined` instead.
 - Never use `any` in the code >> use `unknown` instead.

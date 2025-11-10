@@ -19,7 +19,7 @@ export function createServer() {
         logger: false, // Using plain console instead of pino
         bodyLimit: fromHumanBytes(Env.get('MAX_BODY_SIZE', '10mb')),
         routerOptions: {
-            maxParamLength: Env.get('MAX_URL_LENGTH', 2048),
+            maxParamLength: Env.get('MAX_URL_LENGTH', 4096),
         },
     })
         .withTypeProvider<Provider>()
@@ -58,8 +58,8 @@ export async function registerRoutes(app: ReturnType<typeof createServer>) {
     // Register security plugins FIRST (order matters!)
     await registerSecurityPlugins(app);
 
-    // Register Swagger documentation
-    registerSwagger(app);
+    // Register Swagger plugin BEFORE routes (to capture route schemas during registration)
+    await registerSwagger(app);
 
     // Register all HTTP routes
     registerHealth(app);
