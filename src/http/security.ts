@@ -18,12 +18,12 @@ async function registerHelmet(app: FastifyInstance) {
                 defaultSrc: ["'self'"],
                 // In development, allow localhost for API testing from Scalar UI
                 connectSrc: isDev ? ["'self'", `http://localhost:${port}`, `ws://localhost:${port}`] : ["'self'"],
-                // Scalar API Reference from jsdelivr CDN
+                // Scalar API Reference from jsdelivr CDN (requires unsafe-eval for Vue reactivity)
                 styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
-                scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+                scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
                 scriptSrcElem: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
                 imgSrc: ["'self'", 'data:', 'https:'],
-                fontSrc: ["'self'", 'data:', 'https://cdn.jsdelivr.net'],
+                fontSrc: ["'self'", 'data:', 'https://cdn.jsdelivr.net', 'https://fonts.scalar.com'],
             },
         },
         hsts: {

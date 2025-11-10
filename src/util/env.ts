@@ -96,7 +96,13 @@ export class Env {
             const buff = fs.readFileSync(filename);
             const parsed = parseEnv(buff.toString('utf8'));
             if (parsed) {
-                Object.assign(env, parsed);
+                // Only set values that are NOT already in the environment
+                // This ensures process.env variables take precedence over .env file
+                for (const [key, value] of Object.entries(parsed)) {
+                    if (env[key] === undefined) {
+                        env[key] = value;
+                    }
+                }
                 // Suppress message if --json or --help flag is present (for clean output)
                 if (!process.argv.includes('--json') && !process.argv.includes('--help') && !process.argv.includes('-h')) {
                     console.log(`Loaded .env file: ${filename} with ${Object.keys(parsed).length} vars`);

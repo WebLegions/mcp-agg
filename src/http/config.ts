@@ -5,10 +5,13 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { getManager } from '../controller/mcp-controller/config';
+import { registerMCPServerTools } from '../controller/mcp-controller/register';
 import type { MCPServerConfig } from '../controller/mcp-controller/types';
 import { mcpServerConfigSchema } from '../controller/mcp-controller/types';
+import { MCPServer } from '../lib/mcp-server';
 import { z } from '../lib/validator';
-import type { WithBody, WithParams, WithParamsAndBody } from './route-types';
+import { Env } from '../util';
+import type { WithBody, WithParams, WithParamsAndBody, WithQuerystring } from './route-types';
 
 /**
  * Common response schemas
@@ -38,6 +41,26 @@ const listResponse = z
         total: z.number(),
     })
     .describe('List of MCP servers');
+
+const toolsResponse = z
+    .object({
+        tools: z.array(
+            z.object({
+                name: z.string(),
+                description: z.string().optional(),
+                inputSchema: z.unknown(),
+                serverName: z.string(),
+            }),
+        ),
+        total: z.number(),
+        summary: z.object({
+            totalTools: z.number(),
+            builtinTools: z.number(),
+            externalTools: z.number(),
+            serverBreakdown: z.map(z.number()),
+        }),
+    })
+    .describe('List of available MCP tools');
 
 /**
  * Request schemas for MCP configuration endpoints
@@ -125,6 +148,19 @@ const enableServerSchema = {
     }),
     response: {
         200: enabledResponse,
+        404: errorResponse.describe('Server not found'),
+    },
+};
+
+const listToolsSchema = {
+    description: 'List all available MCP tools from all servers (or filtered by server name)',
+    tags: ['MCP Configuration'],
+    summary: 'List MCP tools',
+    querystring: z.object({
+        server: z.string().optional(),
+    }),
+    response: {
+        200: toolsResponse,
         404: errorResponse.describe('Server not found'),
     },
 };
@@ -276,6 +312,86 @@ export function registerConfig(app: FastifyInstance): void {
                 name: request.params.name,
                 enabled: request.body.enabled,
                 message: `Server ${request.body.enabled ? 'enabled' : 'disabled'} successfully`,
+            });
+        },
+    );
+
+    // GET /api/v1/config/tools - List all tools (or filter by server)
+    app.get<WithQuerystring<{ server?: string }>>(
+        '/api/v1/config/tools',
+        { schema: listToolsSchema },
+        async (request: FastifyRequest<WithQuerystring<{ server?: string }>>, reply: FastifyReply) => {
+            const { server: serverFilter } = request.query;
+
+            // If filtering by server, check if it exists (except for "builtin")
+            if (serverFilter && serverFilter !== 'builtin') {
+                const serverConfig = await manager.getServer(serverFilter);
+                if (!serverConfig) {
+                    return reply.code(404).send({ error: `Server '${serverFilter}' not found` });
+                }
+            }
+
+            // Create a temporary MCP server to gather all tools
+            const tempServer = new MCPServer({
+                name: Env.appName,
+                version: Env.appVersion,
+            });
+
+            // Register all tools (including builtin via InternalClient)
+            await registerMCPServerTools(tempServer);
+
+            // Get all tools using the public API
+            const allTools = tempServer.getAllTools();
+
+            // Build response with metadata
+            const tools: Array<{
+                name: string;
+                description?: string;
+                inputSchema: unknown;
+                serverName: string;
+            }> = [];
+
+            const serverBreakdown = new Map<string, number>();
+            let builtinTools = 0;
+            let externalTools = 0;
+
+            for (const [toolName, toolInfo] of allTools.entries()) {
+                const { definition, serverName } = toolInfo;
+
+                // Apply server filter if specified
+                if (serverFilter && serverName !== serverFilter && serverName !== 'builtin') {
+                    continue;
+                }
+
+                // Track statistics
+                if (serverName === 'builtin') {
+                    builtinTools++;
+                } else {
+                    externalTools++;
+                }
+
+                serverBreakdown.set(serverName, (serverBreakdown.get(serverName) || 0) + 1);
+
+                tools.push({
+                    name: toolName,
+                    description: definition.description,
+                    inputSchema: definition.inputSchema,
+                    serverName,
+                });
+            }
+
+            // Cleanup temporary server
+            await tempServer.close();
+
+            return reply.code(200).send({
+                tools,
+                total: tools.length,
+                summary: {
+                    totalTools: tools.length,
+                    builtinTools,
+                    externalTools,
+                    serverBreakdown,
+                },
             });
         },
     );

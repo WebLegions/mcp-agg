@@ -1,13 +1,7 @@
 import { createInterface } from 'node:readline';
 import * as readline from 'node:readline/promises';
 import { parseArgs } from 'node:util';
-import {
-    connectToMCPServer,
-    getManager,
-    type MCPServerConfig,
-    registerMCPServerTools,
-    registerOwnTools,
-} from '../controller/mcp-controller';
+import { connectToMCPServer, getManager, type MCPServerConfig, registerMCPServerTools } from '../controller/mcp-controller';
 import { MCPConfigManager } from '../controller/mcp-controller/config';
 import { type JSONRPCMessage, MCPServer, McpError } from '../lib/mcp-server';
 import { green, red, yellow } from '../util';
@@ -182,7 +176,6 @@ async function serveCommand() {
         version: Env.appVersion,
     };
     const server = new MCPServer(SERVER_INFO);
-    await registerOwnTools(server);
     await registerMCPServerTools(server);
 
     const rl = createInterface({
@@ -576,7 +569,7 @@ async function listCommand(manager: ReturnType<typeof getManager>, options: Reco
             version: Env.appVersion,
         };
         mcpServer = new MCPServer(SERVER_INFO);
-        await registerOwnTools(mcpServer);
+        await registerMCPServerTools(mcpServer);
 
         const tableData: Record<string, { status: string; transport: string; tools: number; 'command/url': string }> = {};
 

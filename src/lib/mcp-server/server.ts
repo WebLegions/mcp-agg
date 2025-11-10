@@ -76,6 +76,29 @@ export class MCPServer {
     }
 
     /**
+     * Unregister all tools from a specific server by prefix
+     * Used when a server is disabled or removed
+     */
+    async unregisterServerTools(serverName: string): Promise<number> {
+        const prefix = `${serverName}:`;
+        const toRemove: string[] = [];
+
+        // Find all tools with this server prefix
+        for (const [toolName] of this._tools.entries()) {
+            if (toolName.startsWith(prefix)) {
+                toRemove.push(toolName);
+            }
+        }
+
+        // Remove them
+        for (const toolName of toRemove) {
+            this.unregister(toolName);
+        }
+
+        return toRemove.length;
+    }
+
+    /**
      * Close the MCP server and cleanup all registered tools
      * @param force - If true, also force close all MCP client connections regardless of refCount
      */
@@ -90,6 +113,42 @@ export class MCPServer {
         if (force) {
             await connectionPool.closeAll();
         }
+    }
+
+    /**
+     * Get all registered tools with their names and metadata
+     * Returns a map of tool name to tool definition and server name
+     */
+    getAllTools(): Map<
+        string,
+        {
+            definition: ToolDefinition;
+            serverName: string;
+        }
+    > {
+        const toolsMap = new Map<
+            string,
+            {
+                definition: ToolDefinition;
+                serverName: string;
+            }
+        >();
+
+        for (const [toolName, registration] of this._tools.entries()) {
+            // Determine server name from tool name
+            let serverName = 'builtin';
+            if (toolName.includes(':')) {
+                const parts = toolName.split(':');
+                serverName = parts[0];
+            }
+
+            toolsMap.set(toolName, {
+                definition: registration.definition,
+                serverName,
+            });
+        }
+
+        return toolsMap;
     }
 
     /**

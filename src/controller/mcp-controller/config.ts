@@ -58,10 +58,12 @@ export class MCPConfigManager extends EventEmitter {
     }
 
     async readConfig(): Promise<MCPConfigFile> {
+        let config: MCPConfigFile;
+
         try {
             const content = await readFile(this._configPath, 'utf-8');
             const parsed = JSON.parse(content);
-            return mcpConfigFileSchema.parse(parsed);
+            config = mcpConfigFileSchema.parse(parsed);
         } catch (error) {
             // If file exists but is corrupt, try loading backup
             const [exists] = await access(this._configPath);
@@ -75,20 +77,40 @@ export class MCPConfigManager extends EventEmitter {
                         const backupParsed = JSON.parse(backupContent);
                         const validBackup = mcpConfigFileSchema.parse(backupParsed);
                         console.log('Successfully loaded config from backup');
-                        return validBackup;
+                        config = validBackup;
                     } catch (backupError) {
                         console.error('Backup file is also corrupt:', backupError);
+                        config = { mcpServers: new Map() };
                     }
+                } else {
+                    config = { mcpServers: new Map() };
                 }
+            } else {
+                // Return empty config if no valid backup exists
+                console.error('Failed to parse MCP config, returning empty config:', new ErrorEx(error));
+                config = { mcpServers: new Map() };
             }
-
-            // Return empty config if no valid backup exists
-            console.error('Failed to parse MCP config, returning empty config:', new ErrorEx(error));
-            return { mcpServers: new Map() };
         }
+
+        // Always ensure builtin server exists (with default enabled: true if not present)
+        if (!config.mcpServers.has('builtin')) {
+            config.mcpServers.set('builtin', {
+                name: 'builtin',
+                transport: 'stdio',
+                command: 'internal',
+                args: [],
+                enabled: true,
+                description: 'Built-in aggregator tools (health, format_number)',
+            });
+        }
+
+        return config;
     }
 
     async writeConfig(config: MCPConfigFile): Promise<void> {
+        // Write config as-is (including builtin if present)
+        const configToWrite = config;
+
         // Check if file exists before writing
         const [, accessErr] = await access(this._configPath);
         const fileExistedBefore = !accessErr;
@@ -110,7 +132,7 @@ export class MCPConfigManager extends EventEmitter {
         // Exclude 'name' field since it's redundant (used as key)
         const serializableConfig = {
             mcpServers: Object.fromEntries(
-                Array.from(config.mcpServers.entries()).map(([name, value]) => {
+                Array.from(configToWrite.mcpServers.entries()).map(([name, value]) => {
                     const { env, ...rest } = value;
                     return [
                         name,

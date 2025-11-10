@@ -7,7 +7,6 @@ import { existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import * as path from 'node:path';
 import { describe, test } from 'node:test';
 import { MCPConfigManager } from './config';
-import { DEFAULT_MCP_CONFIG } from './types';
 
 const testConfigDir = path.resolve(__dirname, '../../var/test');
 
@@ -40,10 +39,15 @@ async function withManager<T>(testName: string, fn: (manager: MCPConfigManager) 
 }
 
 describe('readConfig', () => {
-    test('creates default config if file does not exist', async (t) => {
+    test('creates default config with builtin server if file does not exist', async (t) => {
         await withManager(t.name, async (manager) => {
             const config = await manager.readConfig();
-            deepStrictEqual(config, DEFAULT_MCP_CONFIG);
+            strictEqual(config.mcpServers.size, 1);
+            ok(config.mcpServers.has('builtin'));
+            const builtin = config.mcpServers.get('builtin');
+            ok(builtin);
+            strictEqual(builtin.name, 'builtin');
+            strictEqual(builtin.description, 'Built-in aggregator tools (health, format_number)');
         });
     });
 
@@ -60,10 +64,12 @@ describe('readConfig', () => {
             if (server.transport === 'stdio') {
                 strictEqual(server.command, 'node');
             }
+            // builtin should always be present
+            strictEqual(config.mcpServers.has('builtin'), true);
         });
     });
 
-    test('returns default config on invalid JSON', async (t) => {
+    test('returns default config with builtin on invalid JSON', async (t) => {
         await withManager(t.name, async (manager) => {
             const testPath = getTestConfigPath(t.name);
             mkdirSync(path.dirname(testPath), { recursive: true });
@@ -71,11 +77,12 @@ describe('readConfig', () => {
             await fs.writeFile(testPath, 'invalid json', 'utf8');
 
             const config = await manager.readConfig();
-            deepStrictEqual(config, DEFAULT_MCP_CONFIG);
+            strictEqual(config.mcpServers.size, 1);
+            ok(config.mcpServers.has('builtin'));
         });
     });
 
-    test('returns default config on invalid schema', async (t) => {
+    test('returns default config with builtin on invalid schema', async (t) => {
         await withManager(t.name, async (manager) => {
             const testPath = getTestConfigPath(t.name);
             const invalidConfig = { invalid: 'structure' };
@@ -83,7 +90,8 @@ describe('readConfig', () => {
             await fs.writeFile(testPath, JSON.stringify(invalidConfig), 'utf8');
 
             const config = await manager.readConfig();
-            deepStrictEqual(config, DEFAULT_MCP_CONFIG);
+            strictEqual(config.mcpServers.size, 1);
+            ok(config.mcpServers.has('builtin'));
         });
     });
 });
@@ -216,10 +224,12 @@ describe('isValidConfig', () => {
 });
 
 describe('CRUD operations', () => {
-    test('getAllServers returns empty array for default config', async (t) => {
+    test('getAllServers returns builtin server for default config', async (t) => {
         await withManager(t.name, async (manager) => {
             const servers = await manager.getAllServers();
-            deepStrictEqual(servers, []);
+            strictEqual(servers.length, 1);
+            strictEqual(servers[0].name, 'builtin');
+            strictEqual(servers[0].description, 'Built-in aggregator tools (health, format_number)');
         });
     });
 
@@ -229,8 +239,11 @@ describe('CRUD operations', () => {
             await manager.upsertServer(serverConfig);
 
             const servers = await manager.getAllServers();
-            strictEqual(servers.length, 1);
-            deepStrictEqual(servers[0], serverConfig);
+            // builtin stays present, new server is added
+            strictEqual(servers.length, 2);
+            const newServer = servers.find((s) => s.name === 'new-server');
+            ok(newServer);
+            deepStrictEqual(newServer, serverConfig);
         });
     });
 
@@ -243,9 +256,11 @@ describe('CRUD operations', () => {
             await manager.upsertServer(serverConfig2);
 
             const servers = await manager.getAllServers();
-            strictEqual(servers.length, 1);
-            if (servers[0].transport === 'stdio') {
-                strictEqual(servers[0].command, 'bun');
+            strictEqual(servers.length, 2); // server + builtin
+            const updatedServer = servers.find((s) => s.name === 'server');
+            ok(updatedServer);
+            if (updatedServer.transport === 'stdio') {
+                strictEqual(updatedServer.command, 'bun');
             }
         });
     });
@@ -276,7 +291,9 @@ describe('CRUD operations', () => {
             ok(removed);
 
             const servers = await manager.getAllServers();
-            strictEqual(servers.length, 0);
+            // After removing the last server, builtin appears again
+            strictEqual(servers.length, 1);
+            strictEqual(servers[0].name, 'builtin');
         });
     });
 
@@ -317,7 +334,7 @@ describe('enabled/disabled servers', () => {
             await manager.upsertServer(disabled);
 
             const enabledServers = await manager.getEnabled();
-            strictEqual(enabledServers.length, 2);
+            strictEqual(enabledServers.length, 3); // enabled1, enabled2, + builtin
             ok(enabledServers.every((s) => s.enabled !== false));
         });
     });
@@ -374,7 +391,7 @@ describe('multiple servers', () => {
             }
 
             const allServers = await manager.getAllServers();
-            strictEqual(allServers.length, 3);
+            strictEqual(allServers.length, 4); // 3 + builtin
         });
     });
 
@@ -392,9 +409,11 @@ describe('multiple servers', () => {
             await manager.removeServer('b-server');
 
             const servers = await manager.getAllServers();
-            strictEqual(servers.length, 2);
-            strictEqual(servers[0].name, 'a-server');
-            strictEqual(servers[1].name, 'c-server');
+            strictEqual(servers.length, 3); // a, c, + builtin
+            const nonBuiltinServers = servers.filter((s) => s.name !== 'builtin');
+            strictEqual(nonBuiltinServers.length, 2);
+            strictEqual(nonBuiltinServers[0].name, 'a-server');
+            strictEqual(nonBuiltinServers[1].name, 'c-server');
         });
     });
 });

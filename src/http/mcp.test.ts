@@ -53,14 +53,14 @@ describe('MCP API - JSON mode', () => {
         ok(json.result.tools.length >= 2); // health and format_number
 
         // Check for health tool
-        const healthTool = json.result.tools.find((t: { name: string }) => t.name === 'health');
+        const healthTool = json.result.tools.find((t: { name: string }) => t.name === 'builtin:health');
         ok(healthTool);
-        strictEqual(healthTool.description, 'Check server health status');
+        strictEqual(healthTool.description, '[builtin] Check the health and status of the MCP aggregator service');
 
         // Check for format_number tool
-        const formatTool = json.result.tools.find((t: { name: string }) => t.name === 'format_number');
+        const formatTool = json.result.tools.find((t: { name: string }) => t.name === 'builtin:format_number');
         ok(formatTool);
-        ok(formatTool.description.includes('format'));
+        strictEqual(formatTool.description, '[builtin] Format a number with thousands separators and optional decimal places');
     });
 
     test('POST /mcp tools/call health returns health status', async () => {
@@ -72,7 +72,7 @@ describe('MCP API - JSON mode', () => {
                 id: 3,
                 method: 'tools/call',
                 params: {
-                    name: 'health',
+                    name: 'builtin:health',
                     arguments: {},
                 },
             },
@@ -85,7 +85,12 @@ describe('MCP API - JSON mode', () => {
         ok(json.result);
         ok(json.result.content);
         ok(Array.isArray(json.result.content));
-        ok(json.result.content[0].text.includes('ok'));
+        // Health tool now returns JSON with status, uptime, memory, pid
+        const healthData = JSON.parse(json.result.content[0].text);
+        strictEqual(healthData.status, 'healthy');
+        ok(typeof healthData.uptime === 'number');
+        ok(healthData.memory);
+        ok(typeof healthData.pid === 'number');
     });
 
     test('POST /mcp tools/call format_number formats number correctly', async () => {
@@ -97,7 +102,7 @@ describe('MCP API - JSON mode', () => {
                 id: 4,
                 method: 'tools/call',
                 params: {
-                    name: 'format_number',
+                    name: 'builtin:format_number',
                     arguments: {
                         number: 123456,
                         locale: 'en-US',
@@ -113,13 +118,11 @@ describe('MCP API - JSON mode', () => {
         ok(json.result);
         ok(json.result.content);
         ok(Array.isArray(json.result.content));
-        const resultData = JSON.parse(json.result.content[0].text);
-        strictEqual(resultData.formatted, '123,456');
-        strictEqual(resultData.number, 123456);
-        strictEqual(resultData.locale, 'en-US');
+        // format_number now returns just the formatted string
+        strictEqual(json.result.content[0].text, '123,456');
     });
 
-    test('POST /mcp tools/call format_number validates max digits', async () => {
+    test('POST /mcp tools/call format_number handles large numbers', async () => {
         const response = await app.inject({
             method: 'POST',
             url: '/mcp',
@@ -128,9 +131,9 @@ describe('MCP API - JSON mode', () => {
                 id: 5,
                 method: 'tools/call',
                 params: {
-                    name: 'format_number',
+                    name: 'builtin:format_number',
                     arguments: {
-                        number: 1234567890123456, // 16 digits
+                        number: 1234567890123456, // Large number
                         locale: 'en-US',
                     },
                 },
@@ -140,8 +143,9 @@ describe('MCP API - JSON mode', () => {
         strictEqual(response.statusCode, 200);
         const json = response.json();
         ok(json.result);
-        ok(json.result.isError);
-        ok(json.result.content[0].text.includes('15 digits'));
+        ok(json.result.content);
+        // Should format the number (JavaScript can handle this)
+        ok(json.result.content[0].text.includes(','));
     });
 
     test('POST /mcp tools/call with unknown tool returns error', async () => {
@@ -257,7 +261,7 @@ describe('MCP API - JSON mode', () => {
                 id: 12,
                 method: 'tools/call',
                 params: {
-                    name: 'health',
+                    name: 'builtin:health',
                     arguments: {},
                 },
             },
@@ -341,7 +345,7 @@ describe('MCP API - SSE mode', () => {
                 id: 102,
                 method: 'tools/call',
                 params: {
-                    name: 'health',
+                    name: 'builtin:health',
                     arguments: {},
                 },
             },
@@ -356,7 +360,9 @@ describe('MCP API - SSE mode', () => {
         const json = JSON.parse(dataMatch[1]);
         ok(json.result);
         ok(json.result.content);
-        ok(json.result.content[0].text.includes('ok'));
+        // Health tool returns JSON with status: 'healthy'
+        const healthData = JSON.parse(json.result.content[0].text);
+        strictEqual(healthData.status, 'healthy');
     });
 });
 

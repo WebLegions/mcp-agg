@@ -13,24 +13,31 @@ import { type ArrV, array, type Validator } from '../validator';
 let _validators: { list: ArrV<ToolDefinition>; result: Validator<ToolResult> } | undefined;
 
 /** Initialize validators on first access */
-function initValidators() {
+async function initValidators() {
     if (!_validators) {
-        const { toolDefinitionSchema, toolResultSchema } = require('../mcp-server');
+        const mod = await import('../mcp-server'); // import here to avoid circular dependency
         _validators = {
-            list: array(toolDefinitionSchema),
-            result: toolResultSchema,
+            list: array(mod.toolDefinitionSchema),
+            result: mod.toolResultSchema,
         };
     }
 }
 
 export const validators = {
     get list(): ArrV<ToolDefinition> {
-        initValidators();
-        return _validators!.list;
+        if (!_validators) {
+            throw new Error('validators not initialized. Call await validators.init() first.');
+        }
+        return _validators.list;
     },
     get result(): Validator<ToolResult> {
-        initValidators();
-        return _validators!.result;
+        if (!_validators) {
+            throw new Error('validators not initialized. Call await validators.init() first.');
+        }
+        return _validators.result;
+    },
+    async init() {
+        await initValidators();
     },
 } as const;
 

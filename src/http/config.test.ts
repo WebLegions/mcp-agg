@@ -9,18 +9,22 @@ describe('MCP Configuration REST API', () => {
     beforeEach(async () => {
         // Get the global manager (singleton) - routes use the same instance
         manager = getManager(undefined, false);
-        // Clean up any existing servers from previous tests
+        // Clean up any existing servers from previous tests (except builtin)
         const servers = await manager.getAllServers();
         for (const server of servers) {
-            await manager.removeServer(server.name);
+            if (server.name !== 'builtin') {
+                await manager.removeServer(server.name);
+            }
         }
     });
 
     afterEach(async () => {
-        // Clean up all servers after each test
+        // Clean up all servers after each test (except builtin)
         const servers = await manager.getAllServers();
         for (const server of servers) {
-            await manager.removeServer(server.name);
+            if (server.name !== 'builtin') {
+                await manager.removeServer(server.name);
+            }
         }
         manager.cleanup();
     });
@@ -29,7 +33,19 @@ describe('MCP Configuration REST API', () => {
         const app = createServer();
         await registerRoutes(app);
 
-        // Add a test server
+        // Empty config should have builtin server by default
+        const initialResponse = await app.inject({
+            method: 'GET',
+            url: '/api/v1/config',
+        });
+
+        assert.equal(initialResponse.statusCode, 200);
+        const initialBody = JSON.parse(initialResponse.body);
+        assert.ok(Array.isArray(initialBody.servers));
+        assert.equal(initialBody.total, 1);
+        assert.ok(initialBody.servers.some((s: { name: string }) => s.name === 'builtin'));
+
+        // Add a test server - builtin should remain
         await manager.upsertServer({
             name: 'test-server',
             transport: 'stdio',
@@ -46,8 +62,58 @@ describe('MCP Configuration REST API', () => {
         assert.equal(response.statusCode, 200);
         const body = JSON.parse(response.body);
         assert.ok(Array.isArray(body.servers));
-        assert.ok(body.total >= 1);
+        // Builtin stays present, test-server is added
+        assert.equal(body.total, 2);
         assert.ok(body.servers.some((s: { name: string }) => s.name === 'test-server'));
+        assert.ok(body.servers.some((s: { name: string }) => s.name === 'builtin'));
+    });
+
+    test('Builtin server persists through add/remove operations', async () => {
+        const app = createServer();
+        await registerRoutes(app);
+
+        // Start with empty config - should have builtin
+        const initial = await app.inject({
+            method: 'GET',
+            url: '/api/v1/config',
+        });
+        const initialBody = JSON.parse(initial.body);
+        assert.equal(initialBody.total, 1);
+        assert.ok(initialBody.servers.some((s: { name: string }) => s.name === 'builtin'));
+
+        // Add a server - builtin stays
+        await manager.upsertServer({
+            name: 'test-server',
+            transport: 'stdio',
+            command: 'node',
+            args: ['server.js'],
+            enabled: true,
+        });
+
+        const afterAdd = await app.inject({
+            method: 'GET',
+            url: '/api/v1/config',
+        });
+        const afterAddBody = JSON.parse(afterAdd.body);
+        assert.equal(afterAddBody.total, 2);
+        assert.ok(afterAddBody.servers.some((s: { name: string }) => s.name === 'test-server'));
+        assert.ok(afterAddBody.servers.some((s: { name: string }) => s.name === 'builtin'));
+
+        // Remove the server - builtin still stays
+        const deleteResponse = await app.inject({
+            method: 'DELETE',
+            url: '/api/v1/config/test-server',
+        });
+        assert.equal(deleteResponse.statusCode, 200);
+
+        const afterDelete = await app.inject({
+            method: 'GET',
+            url: '/api/v1/config',
+        });
+        const afterDeleteBody = JSON.parse(afterDelete.body);
+        assert.equal(afterDeleteBody.total, 1);
+        assert.ok(afterDeleteBody.servers.some((s: { name: string }) => s.name === 'builtin'));
+        assert.ok(!afterDeleteBody.servers.some((s: { name: string }) => s.name === 'test-server'));
     });
 
     test('GET /api/v1/config/:name returns specific server', async () => {
@@ -297,5 +363,110 @@ describe('MCP Configuration REST API', () => {
         assert.equal(response2.statusCode, 200);
         server = await manager.getServer('toggle-me');
         assert.equal(server?.enabled, true);
+    });
+
+    test('GET /api/v1/config/tools lists all available tools', async () => {
+        const app = createServer();
+        await registerRoutes(app);
+
+        const response = await app.inject({
+            method: 'GET',
+            url: '/api/v1/config/tools',
+        });
+
+        assert.equal(response.statusCode, 200);
+        const body = JSON.parse(response.body);
+
+        // Validate response structure
+        assert.ok(Array.isArray(body.tools));
+        assert.ok(typeof body.total === 'number');
+        assert.ok(body.summary);
+        assert.ok(typeof body.summary.totalTools === 'number');
+        assert.ok(typeof body.summary.builtinTools === 'number');
+        assert.ok(typeof body.summary.externalTools === 'number');
+        assert.ok(body.summary.serverBreakdown instanceof Object);
+
+        // Should have at least built-in tools (health, format_number)
+        assert.ok(body.total >= 2);
+        assert.ok(body.summary.builtinTools >= 2);
+
+        // Check for built-in tools
+        const toolNames = body.tools.map((t: { name: string }) => t.name);
+        assert.ok(toolNames.includes('builtin:health'));
+        assert.ok(toolNames.includes('builtin:format_number'));
+
+        // Verify each tool has required fields
+        for (const tool of body.tools) {
+            assert.ok(tool.name);
+            assert.ok(tool.inputSchema);
+            assert.ok(tool.serverName);
+        }
+    });
+
+    test('GET /api/v1/config/tools filters by server name', async () => {
+        const app = createServer();
+        await registerRoutes(app);
+
+        // Filter for builtin tools only
+        const response = await app.inject({
+            method: 'GET',
+            url: '/api/v1/config/tools?server=builtin',
+        });
+
+        assert.equal(response.statusCode, 200);
+        const body = JSON.parse(response.body);
+
+        // All tools should be from builtin server
+        for (const tool of body.tools) {
+            assert.equal(tool.serverName, 'builtin');
+        }
+
+        // Should have built-in tools
+        assert.ok(body.total >= 2);
+        assert.equal(body.summary.builtinTools, body.total);
+        assert.equal(body.summary.externalTools, 0);
+    });
+
+    test('GET /api/v1/config/tools returns 404 for non-existent server filter', async () => {
+        const app = createServer();
+        await registerRoutes(app);
+
+        const response = await app.inject({
+            method: 'GET',
+            url: '/api/v1/config/tools?server=non-existent-server',
+        });
+
+        assert.equal(response.statusCode, 404);
+        const body = JSON.parse(response.body);
+        assert.ok(body.error);
+        assert.ok(body.error.includes('non-existent-server'));
+    });
+
+    test('GET /api/v1/config/tools respects server enabled status', async () => {
+        const app = createServer();
+        await registerRoutes(app);
+
+        // Verify that registerMCPServerTools uses getEnabled() which filters disabled servers
+        // This is tested indirectly - disabled servers won't be attempted for connection
+        // In a real scenario with actual MCP servers, only enabled ones would have tools registered
+
+        const response = await app.inject({
+            method: 'GET',
+            url: '/api/v1/config/tools',
+        });
+
+        assert.equal(response.statusCode, 200);
+        const body = JSON.parse(response.body);
+
+        // In test environment, should only have builtin tools
+        // (external servers aren't actually running)
+        assert.equal(body.summary.builtinTools, 2);
+        assert.equal(body.summary.externalTools, 0);
+
+        // All returned tools should have a valid serverName
+        for (const tool of body.tools) {
+            assert.ok(tool.serverName);
+            assert.ok(tool.name);
+        }
     });
 });

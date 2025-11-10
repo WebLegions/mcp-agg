@@ -6,7 +6,7 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest, FastifySchema } from 'fastify';
 import { getManager } from '../controller/mcp-controller/config';
-import { registerMCPServerTools, registerOwnTools } from '../controller/mcp-controller/register';
+import { registerMCPServerTools } from '../controller/mcp-controller/register';
 import { type JSONRPCMessage, SessionStore } from '../lib/mcp-server';
 import { Env } from '../util';
 
@@ -42,7 +42,6 @@ async function getOrCreateSession(sessionId?: string) {
 
     // Create new session
     const session = sessions.create(SERVER_INFO);
-    await registerOwnTools(session.server);
     await registerMCPServerTools(session.server);
 
     return session;
@@ -280,13 +279,42 @@ function setupConfigManager(): void {
     // Get manager (auto-initializes on first call)
     const manager = getManager(undefined, watch);
 
-    // Listen for config changes and notify all sessions (only if watching)
+    // Listen for config changes and clean up/reload tools (only if watching)
     if (watch) {
-        manager.on('config:changed', () => {
-            console.log('Config changed - notifying all sessions');
-            // Each session will reload tools on their next request
-            // For now, just notify clients that tools changed
-            sessions.notifyAllSessions((s) => s.emitToolListChanged());
+        manager.on('config:changed', async () => {
+            console.log('Config changed - reloading tools in all sessions');
+
+            // Get current enabled servers
+            const enabledServers = await manager.getEnabled();
+            const enabledNames = new Set(enabledServers.map((s) => s.name));
+
+            // For each session, unregister tools from disabled/deleted servers
+            // and re-register tools from enabled servers
+            sessions.notifyAllSessions(async (session) => {
+                // Get all current tools and their server names
+                const allTools = session.server.getAllTools();
+                const registeredServers = new Set<string>();
+
+                for (const [, toolInfo] of allTools.entries()) {
+                    if (toolInfo.serverName !== 'builtin') {
+                        registeredServers.add(toolInfo.serverName);
+                    }
+                }
+
+                // Unregister tools from servers that are no longer enabled
+                for (const serverName of registeredServers) {
+                    if (!enabledNames.has(serverName)) {
+                        const removed = await session.server.unregisterServerTools(serverName);
+                        console.log(`Removed ${removed} tools from disabled/deleted server: ${serverName}`);
+                    }
+                }
+
+                // Re-register tools from all enabled servers (this will add new ones)
+                await registerMCPServerTools(session.server);
+
+                // Notify client that tools list changed
+                session.emitToolListChanged();
+            });
         });
         console.log('MCP config manager initialized with file watching');
     } else {

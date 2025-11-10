@@ -177,7 +177,8 @@ const _SWAGGER_PAGE_HTML = `<!DOCTYPE html>
 </html>`;
 ******************/
 
-const SCALAR_PAGE_HTML = `<!DOCTYPE html>
+const SCALAR_PAGE_HTML = `
+<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -186,7 +187,11 @@ const SCALAR_PAGE_HTML = `<!DOCTYPE html>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 <body>
-  <script id="api-reference" data-url="/api/v1/openapi.json"></script>
+  <script
+    id="api-reference"
+    data-url="/api/v1/openapi.json"
+    data-configuration='{"showSidebar":true,"hideModels":true}'></script>
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.39.3"></script>
 </body>
-</html>`;
+</html>
+`;

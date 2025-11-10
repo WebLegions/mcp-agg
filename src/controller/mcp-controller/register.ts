@@ -3,12 +3,10 @@
  * Combines server connection factory and tool aggregation
  */
 
-import { connectionPool, HttpClient, type MCPClient, SseClient, StdioClient } from '../../lib/mcp-client';
+import { connectionPool, HttpClient, InternalClient, type MCPClient, SseClient, StdioClient } from '../../lib/mcp-client';
 import { MCPServer, McpError, type ToolResult } from '../../lib/mcp-server';
 import { Env } from '../../util';
 import { getManager } from './config';
-import { registerFormatNumberTool } from './format-number-tool';
-import { registerHealthTool } from './health-tool';
 import type { MCPServerConfig } from './types';
 
 /**
@@ -16,6 +14,13 @@ import type { MCPServerConfig } from './types';
  * Returns a unified MCPClient interface regardless of transport
  */
 export async function connectToMCPServer(config: MCPServerConfig): Promise<MCPClient> {
+    // Handle builtin server - return internal client
+    if (config.name === 'builtin') {
+        const client = new InternalClient();
+        await client.connect();
+        return client;
+    }
+
     switch (config.transport) {
         case 'stdio': {
             const args = (Array.isArray(config.args) ? config.args : []) as string[];
@@ -49,18 +54,9 @@ export async function connectToMCPServer(config: MCPServerConfig): Promise<MCPCl
 }
 
 /**
- * Register all tools with the MCP server
- * Includes both local tools and tools from all enabled MCP servers
- */
-export async function registerOwnTools(server: MCPServer): Promise<void> {
-    // Register local tools
-    registerHealthTool(server);
-    registerFormatNumberTool(server);
-}
-
-/**
  * Register tools from all enabled MCP servers
  * Tools are prefixed with {serverName}:{toolName}
+ * Includes builtin tools via InternalClient
  */
 export async function registerMCPServerTools(server: MCPServer): Promise<void> {
     try {
@@ -68,7 +64,7 @@ export async function registerMCPServerTools(server: MCPServer): Promise<void> {
         const manager = getManager();
         const enabled = await manager.getEnabled();
 
-        // Connect to all servers in parallel
+        // Connect to all servers in parallel (including builtin via InternalClient)
         const connectionPromises = enabled.map(async (conf) => {
             const serverName = String(conf.name);
 
@@ -103,14 +99,15 @@ export async function registerMCPServerTools(server: MCPServer): Promise<void> {
                 // Initialize or increment ref count for this connection
                 connection!.refCount += tools.length;
 
-                // Register each tool with prefixed name and cleanup callback
+                // Register each tool with serverName:toolName prefix
                 for (const tool of tools) {
                     const name = `${serverName}:${tool.name}`;
+                    const description = `[${serverName}] ${tool.description}`;
 
                     server.register(
                         {
                             name,
-                            description: `[${serverName}] ${tool.description}`,
+                            description,
                             inputSchema: tool.inputSchema,
                         },
                         async (args): Promise<ToolResult> => {

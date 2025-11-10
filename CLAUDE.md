@@ -77,6 +77,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Environment Configuration
 
 - **NODE_ENV values**: `development` (default), `production` (Docker only)
+  - Use `bun script/run-tests.ts --port 4000` to run tests on a different port if needed
 - **Development and tests**: Both use `.env.development` (NODE_ENV=development)
 - **Production**: Environment variables set directly in Dockerfile (`NODE_ENV=production`)
 - **Environment loading**: Attempts to load `.env.{NODE_ENV}`, falls back to defaults if file doesn't exist

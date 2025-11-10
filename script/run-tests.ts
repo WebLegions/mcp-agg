@@ -2,14 +2,16 @@
 //
 // script is called by 'bun run test' command
 // Usage examples:
-//    bun run script/run-tests.ts                - runs all tests with quiet output (only errors and summary)
-//    bun run script/run-tests.ts --verbose      - runs all tests with full verbose output
-//    bun run script/run-tests.ts src/util       - runs specific test files with verbose output
+//    bun run script/run-tests.ts                     - runs all tests with quiet output (only errors and summary)
+//    bun run script/run-tests.ts --verbose           - runs all tests with full verbose output
+//    bun run script/run-tests.ts --port 4000         - runs all tests on port 4000 (default: 13582)
+//    bun run script/run-tests.ts src/util            - runs specific test files with verbose output
 //
 
 import { spawn } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseArgs } from 'node:util';
 
 // Clean up coverage folder before running tests
 const coveragePath = join(process.cwd(), 'coverage');
@@ -17,51 +19,52 @@ if (existsSync(coveragePath)) {
     rmSync(coveragePath, { recursive: true, force: true });
 }
 
-// Parse command line arguments
-// If we have specific test files (non-default pattern) or --verbose flag, turn on verbose
-const args = process.argv.slice(2);
-const filteredArgs = args.filter((arg) => arg !== '--verbose' && arg !== '-v');
-const hasVerboseFlag = args.length > filteredArgs.length;
-const hasSpecificFiles = filteredArgs.length > 0;
-let verbose = hasVerboseFlag || hasSpecificFiles;
+// Parse command line arguments using node:util.parseArgs
+const { values, positionals } = parseArgs({
+    args: process.argv.slice(2),
+    options: {
+        verbose: {
+            type: 'boolean',
+            short: 'v',
+            default: false,
+        },
+        port: {
+            type: 'string',
+            short: 'p',
+            default: '13582',
+        },
+    },
+    allowPositionals: true,
+});
 
-// State tracking for filtering
-let buffer = '';
-
-// Strip ANSI codes for filtering logic
-const stripAnsi = (str: string): string => {
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences use control characters
-    return str.replace(/\u001b\[\d*m/g, '');
-};
+const hasSpecificFiles = positionals.length > 0;
+let verbose = values.verbose || hasSpecificFiles;
+let output = '';
 
 // Determine if a line should be shown in quiet mode
 const shouldShow = (line: string): boolean => {
-    if (!line.trim()) return false;
+    if (!line || !line.trim()) return false;
 
-    // Always output the summary report till the end
+    // // Once summary starts, show everything
     if (!verbose && /^\s*\d+\s+(pass|fail|skip)/.test(line)) {
-        verbose = true; // Once summary starts, show everything
+        verbose = true;
     }
 
     if (verbose) return true;
 
-    const clean = stripAnsi(line);
-
     // Show errors and failures
     if (
-        clean.includes('✗') ||
-        clean.includes('(fail)') ||
-        clean.includes('Error:') ||
-        clean.includes('AssertionError') ||
-        clean.includes('Expected') ||
-        clean.includes('Timed out') ||
-        clean.includes('error TS')
+        line.includes('✗') ||
+        line.includes('(fail)') ||
+        line.includes('Error:') ||
+        line.includes('Assertion') ||
+        line.includes('Expected') ||
+        line.includes('Timed out') ||
+        line.includes('error TS') ||
+        // Show coverage summary line
+        line.includes('Coverage meets threshold') ||
+        line.includes('Coverage below threshold')
     ) {
-        return true;
-    }
-
-    // Show coverage summary line
-    if (clean.includes('Coverage meets threshold') || clean.includes('Coverage below threshold')) {
         return true;
     }
 
@@ -71,11 +74,11 @@ const shouldShow = (line: string): boolean => {
 
 // Process output line by line
 const processOutput = (data: string, stream: NodeJS.WriteStream): void => {
-    buffer += data;
-    const lines = buffer.split('\n');
+    output += data;
+    const lines = output.split('\n');
 
     // Keep the last incomplete line in the buffer
-    buffer = lines.pop() || '';
+    output = lines.pop() || '';
 
     for (const line of lines) {
         if (shouldShow(line)) {
@@ -87,13 +90,13 @@ const processOutput = (data: string, stream: NodeJS.WriteStream): void => {
 
 // Flush remaining buffer
 const flushBuffer = (stream: NodeJS.WriteStream): void => {
-    if (buffer && shouldShow(buffer)) {
-        stream.write(`${buffer}\x1b[0m\n`);
+    if (shouldShow(output)) {
+        stream.write(`${output}\x1b[0m\n`);
     }
 };
 
 // Build test arguments
-const testArgs = ['--coverage', '--coverage-reporter=lcov', ...(filteredArgs.length > 0 ? filteredArgs : ['src'])];
+const testArgs = ['--coverage', '--coverage-reporter=lcov', ...(positionals.length > 0 ? positionals : ['src'])];
 
 // Run bun test
 async function runTests(): Promise<number> {
@@ -108,7 +111,7 @@ async function runTests(): Promise<number> {
         const proc = spawn('bun', ['test', ...testArgs], {
             stdio: ['inherit', 'pipe', 'pipe'],
             shell: true,
-            env: { ...process.env, LOG_FORMAT: 'line' },
+            env: { ...process.env, LOG_FORMAT: 'line', PORT: values.port },
         });
 
         // Process stdout

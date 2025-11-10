@@ -3,10 +3,14 @@
  */
 
 import { strict as assert } from 'node:assert/strict';
-import { describe, test } from 'node:test';
+import { beforeEach, describe, test } from 'node:test';
 import { validators } from './client';
 
 describe('client validators', () => {
+    beforeEach(async () => {
+        await validators.init();
+    });
+
     test('validators.list exists and can parse tool definitions', () => {
         const tools = [
             {

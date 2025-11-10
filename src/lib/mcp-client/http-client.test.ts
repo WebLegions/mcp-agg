@@ -3,8 +3,9 @@
  */
 
 import { strict as assert } from 'node:assert/strict';
-import { afterEach, describe, test } from 'node:test';
+import { afterEach, describe, mock, test } from 'node:test';
 import { ResilientClient } from '../../util';
+import { PromiseRetry } from '../../util/resilient-client';
 import { HttpClient } from './http-client';
 
 describe('http-client', () => {
@@ -105,74 +106,66 @@ describe('http-client', () => {
     });
 
     test('listTools sends tools/list request', async () => {
-        // Mock ResilientClient.fetch to return a valid response
-        const originalFetch = ResilientClient.prototype.fetch;
         let callCount = 0;
-
-        try {
-            ResilientClient.prototype.fetch = async () => {
-                callCount++;
-                return {
-                    result: {
-                        tools: [
-                            {
-                                name: 'test_tool',
-                                description: 'A test tool',
-                                inputSchema: {
-                                    type: 'object',
-                                    properties: new Map([['arg1', { type: 'string' }]]),
-                                    required: ['arg1'],
-                                },
+        const mockFn = mock.method(ResilientClient.prototype, 'fetch', (_input: string) => {
+            callCount++;
+            const pr = PromiseRetry.withResolvers();
+            pr.resolve({
+                result: {
+                    tools: [
+                        {
+                            name: 'test_tool',
+                            description: 'A test tool',
+                            inputSchema: {
+                                type: 'object',
+                                properties: new Map([['arg1', { type: 'string' }]]),
+                                required: ['arg1'],
                             },
-                        ],
-                    },
-                };
-            };
+                        },
+                    ],
+                },
+            });
+            return pr;
+        });
 
-            const client = new HttpClient('http://localhost:3000');
-            const tools = await client.listTools();
+        const client = new HttpClient('http://localhost:3000');
+        const tools = await client.listTools();
 
-            assert.equal(tools.length, 1);
-            assert.equal(tools[0].name, 'test_tool');
-            assert.equal(callCount, 1);
-        } finally {
-            ResilientClient.prototype.fetch = originalFetch;
-        }
+        assert.equal(tools.length, 1);
+        assert.equal(tools[0].name, 'test_tool');
+        assert.equal(callCount, 1);
+        assert.equal(mockFn.mock.calls.length > 0, true, 'mock should be called');
+        mockFn.mock.restore();
     });
 
     test('callTool sends tools/call request', async () => {
-        // Mock ResilientClient.fetch to return a valid response
-        const originalFetch = ResilientClient.prototype.fetch;
         let callCount = 0;
+        const mockFn = mock.method(ResilientClient.prototype, 'fetch', (_input: string) => {
+            callCount++;
+            const pr = PromiseRetry.withResolvers();
+            pr.resolve({
+                result: {
+                    content: [{ type: 'text', text: 'Result text' }],
+                    isError: false,
+                },
+            });
+            return pr;
+        });
 
-        try {
-            ResilientClient.prototype.fetch = async () => {
-                callCount++;
-                return {
-                    result: {
-                        content: [{ type: 'text', text: 'Result text' }],
-                        isError: false,
-                    },
-                };
-            };
+        const client = new HttpClient('http://localhost:3000');
+        const result = await client.callTool('test_tool', { arg1: 'value1' });
 
-            const client = new HttpClient('http://localhost:3000');
-            const result = await client.callTool('test_tool', { arg1: 'value1' });
-
-            assert.equal(result.isError, false);
-            assert.equal(result.content.length, 1);
-            assert.equal(callCount, 1);
-        } finally {
-            ResilientClient.prototype.fetch = originalFetch;
-        }
+        assert.equal(result.isError, false);
+        assert.equal(result.content.length, 1);
+        assert.equal(callCount, 1);
+        assert.equal(mockFn.mock.calls.length > 0, true, 'mock should be called');
+        mockFn.mock.restore();
     });
 
     test('_sendRequest handles JSON-RPC errors', async () => {
-        // Mock ResilientClient.fetch to return an error response
-        const originalFetch = ResilientClient.prototype.fetch;
-
-        try {
-            ResilientClient.prototype.fetch = async () => ({
+        const mockFn = mock.method(ResilientClient.prototype, 'fetch', () => {
+            const pr = PromiseRetry.withResolvers();
+            pr.resolve({
                 jsonrpc: '2.0',
                 id: 1,
                 error: {
@@ -180,46 +173,42 @@ describe('http-client', () => {
                     message: 'Invalid request',
                 },
             });
+            return pr;
+        });
 
-            const client = new HttpClient('http://localhost:3000');
+        const client = new HttpClient('http://localhost:3000');
 
-            await assert.rejects(async () => {
-                await client.listTools();
-            });
-
-            // JSON-RPC errors throw immediately without reaching the catch block
-        } finally {
-            ResilientClient.prototype.fetch = originalFetch;
-        }
+        await assert.rejects(async () => {
+            await client.listTools();
+        });
+        assert.equal(mockFn.mock.calls.length > 0, true, 'mock should be called');
+        mockFn.mock.restore();
     });
 
     test('_sendRequest emits error event on network failure', async () => {
-        // Mock ResilientClient.fetch to throw an error
-        const originalFetch = ResilientClient.prototype.fetch;
+        const mockFn = mock.method(ResilientClient.prototype, 'fetch', () => {
+            const pr = PromiseRetry.withResolvers();
+            pr.reject(new Error('Network error'));
+            return pr;
+        });
 
-        try {
-            ResilientClient.prototype.fetch = async () => {
-                throw new Error('Network error');
-            };
+        const client = new HttpClient('http://localhost:3000');
+        let errorEmitted = false;
+        let errorDetail: Error | undefined;
 
-            const client = new HttpClient('http://localhost:3000');
-            let errorEmitted = false;
-            let errorDetail: Error | undefined;
+        client.addEventListener('error', (event) => {
+            errorEmitted = true;
+            errorDetail = (event as CustomEvent<{ error: Error }>).detail.error;
+        });
 
-            client.addEventListener('error', (event) => {
-                errorEmitted = true;
-                errorDetail = (event as CustomEvent<{ error: Error }>).detail.error;
-            });
+        await assert.rejects(async () => {
+            await client.listTools();
+        });
 
-            await assert.rejects(async () => {
-                await client.listTools();
-            });
-
-            assert.equal(errorEmitted, true);
-            assert.ok(errorDetail);
-            assert.equal(errorDetail.message, 'Network error');
-        } finally {
-            ResilientClient.prototype.fetch = originalFetch;
-        }
+        assert.equal(errorEmitted, true);
+        assert.ok(errorDetail);
+        assert.equal(errorDetail.message, 'Network error');
+        assert.equal(mockFn.mock.calls.length > 0, true, 'mock should be called');
+        mockFn.mock.restore();
     });
 });

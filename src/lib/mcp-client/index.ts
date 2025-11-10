@@ -17,5 +17,6 @@ export { connectionPool } from './connection-pool';
 
 // Export all client implementations
 export { HttpClient } from './http-client';
+export { InternalClient } from './internal-client';
 export { SseClient } from './sse-client';
 export { StdioClient } from './stdio-client';
