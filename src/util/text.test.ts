@@ -49,8 +49,8 @@ describe('text utils', () => {
     });
 
     test('escapes special HTML characters', () => {
-        strictEqual(htmlSpecialChars('<div>'), '&#38;#38;#60;div&#38;#38;#62;');
-        strictEqual(htmlSpecialChars('&"\'<>'), '&#38;#38;#38;&#38;#38;#34;&#38;#38;#39;&#38;#38;#60;&#38;#38;#62;');
+        strictEqual(htmlSpecialChars('<div>'), '&lt;div&gt;');
+        strictEqual(htmlSpecialChars('&"\'<>'), '&amp;"\'&lt;&gt;');
         strictEqual(htmlSpecialChars('plain'), 'plain');
         strictEqual(htmlSpecialChars(''), '');
     });

@@ -9,11 +9,15 @@
     "noEmit": true,
     "sourceMap": true,
     "inlineSourceMap": false,
-    "inlineSources": false
+    "inlineSources": false,
+    "skipLibCheck": true
   },
   "include": [
     "src/**/*",
     "ci/**/*",
     "script/*"
+  ],
+  "exclude": [
+    "node_modules"
   ]
 }

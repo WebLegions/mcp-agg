@@ -4,24 +4,20 @@
 
 import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict';
 import { existsSync, mkdirSync, unlinkSync } from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { describe, test } from 'node:test';
+import { sleep } from '../../util';
 import { MCPConfigManager } from './config';
-
-const testConfigDir = path.resolve(__dirname, '../../var/test');
-
-// Ensure test directory exists
-mkdirSync(testConfigDir, { recursive: true });
-
-// Create a helper to get unique test config path
-function getTestConfigPath(testName: string): string {
-    const safeName = testName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    return path.join(testConfigDir, `test-mcp-${safeName}.json`);
-}
 
 // Helper function to run a test with an isolated manager
 async function withManager<T>(testName: string, fn: (manager: MCPConfigManager) => Promise<T>): Promise<T> {
-    const testPath = getTestConfigPath(testName);
+    // Ensure test directory exists
+    const testConfigDir = path.resolve(__dirname, '../../var/test');
+    mkdirSync(testConfigDir, { recursive: true });
+
+    const safeName = testName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const testPath = path.join(testConfigDir, `test-mcp-${safeName}.json`);
 
     // Clean up any existing files
     if (existsSync(testPath)) unlinkSync(testPath);
@@ -35,13 +31,14 @@ async function withManager<T>(testName: string, fn: (manager: MCPConfigManager) 
         // Cleanup test files
         if (existsSync(testPath)) unlinkSync(testPath);
         if (existsSync(`${testPath}.backup`)) unlinkSync(`${testPath}.backup`);
+        manager.cleanup();
     }
 }
 
-describe('readConfig', () => {
+describe('MCP Config file', () => {
     test('creates default config with builtin server if file does not exist', async (t) => {
         await withManager(t.name, async (manager) => {
-            const config = await manager.readConfig();
+            const config = await manager.read();
             strictEqual(config.mcpServers.size, 1);
             ok(config.mcpServers.has('builtin'));
             const builtin = config.mcpServers.get('builtin');
@@ -56,7 +53,7 @@ describe('readConfig', () => {
             const serverConfig = MCPConfigManager.create('test-server', 'stdio', 'node', ['server.js']);
             await manager.upsertServer(serverConfig);
 
-            const config = await manager.readConfig();
+            const config = await manager.read();
             ok(config.mcpServers.has('test-server'));
             const server = config.mcpServers.get('test-server');
             ok(server);
@@ -69,43 +66,27 @@ describe('readConfig', () => {
         });
     });
 
-    test('returns default config with builtin on invalid JSON', async (t) => {
-        await withManager(t.name, async (manager) => {
-            const testPath = getTestConfigPath(t.name);
-            mkdirSync(path.dirname(testPath), { recursive: true });
-            const fs = await import('node:fs/promises');
-            await fs.writeFile(testPath, 'invalid json', 'utf8');
-
-            const config = await manager.readConfig();
-            strictEqual(config.mcpServers.size, 1);
-            ok(config.mcpServers.has('builtin'));
-        });
-    });
-
     test('returns default config with builtin on invalid schema', async (t) => {
         await withManager(t.name, async (manager) => {
-            const testPath = getTestConfigPath(t.name);
+            const configPath = Object(manager)._configPath as string;
             const invalidConfig = { invalid: 'structure' };
-            const fs = await import('node:fs/promises');
-            await fs.writeFile(testPath, JSON.stringify(invalidConfig), 'utf8');
+            await fs.writeFile(configPath, JSON.stringify(invalidConfig), 'utf8');
 
-            const config = await manager.readConfig();
+            const config = await manager.read();
             strictEqual(config.mcpServers.size, 1);
             ok(config.mcpServers.has('builtin'));
         });
     });
-});
 
-describe('writeConfig', () => {
     test('writes config to file', async (t) => {
         await withManager(t.name, async (manager) => {
-            const testPath = getTestConfigPath(t.name);
+            const configPath = Object(manager)._configPath as string;
             const serverConfig = MCPConfigManager.create('write-test', 'sse', 'http://example.com/sse');
             await manager.upsertServer(serverConfig);
 
-            ok(existsSync(testPath));
+            ok(existsSync(configPath));
 
-            const config = await manager.readConfig();
+            const config = await manager.read();
             ok(config.mcpServers.has('write-test'));
             const server = config.mcpServers.get('write-test');
             ok(server);
@@ -118,112 +99,96 @@ describe('writeConfig', () => {
 
     test('creates backup when overwriting', async (t) => {
         await withManager(t.name, async (manager) => {
-            const testPath = getTestConfigPath(t.name);
+            const configPath = Object(manager)._configPath as string;
             const server1 = MCPConfigManager.create('server1', 'stdio', 'node');
             await manager.upsertServer(server1);
 
             const server2 = MCPConfigManager.create('server2', 'stdio', 'bun');
             await manager.upsertServer(server2);
 
-            ok(existsSync(`${testPath}.backup`));
+            ok(existsSync(`${configPath}.backup`));
 
             // Verify backup contains old config (server1 only)
-            const backupManager = new MCPConfigManager(`${testPath}.backup`);
-            const backupConfig = await backupManager.readConfig();
+            const backupManager = new MCPConfigManager(`${configPath}.backup`);
+            const backupConfig = await backupManager.read();
             ok(backupConfig.mcpServers.has('server1'));
             ok(!backupConfig.mcpServers.has('server2'));
 
             // Verify current contains both servers
-            const currentConfig = await manager.readConfig();
+            const currentConfig = await manager.read();
             ok(currentConfig.mcpServers.has('server1'));
             ok(currentConfig.mcpServers.has('server2'));
         });
     });
-});
 
-describe('createServerConfig', () => {
-    test('creates stdio server config', async (t) => {
-        await withManager(t.name, async (_manager) => {
-            const config = MCPConfigManager.create('test', 'stdio', 'node', ['server.js']);
-            deepStrictEqual(config, {
-                name: 'test',
-                transport: 'stdio',
-                command: 'node',
-                args: ['server.js'],
-                enabled: true,
-            });
+    test('creates stdio server config', async () => {
+        const config = MCPConfigManager.create('test', 'stdio', 'node', ['server.js']);
+        deepStrictEqual(config, {
+            name: 'test',
+            transport: 'stdio',
+            command: 'node',
+            args: ['server.js'],
+            enabled: true,
         });
     });
 
-    test('creates sse server config', async (t) => {
-        await withManager(t.name, async (_manager) => {
-            const config = MCPConfigManager.create('test', 'sse', 'http://example.com');
-            deepStrictEqual(config, {
-                name: 'test',
-                transport: 'sse',
-                url: 'http://example.com',
-                enabled: true,
-            });
+    test('creates sse server config', async () => {
+        const config = MCPConfigManager.create('test', 'sse', 'http://example.com');
+        deepStrictEqual(config, {
+            name: 'test',
+            transport: 'sse',
+            url: 'http://example.com',
+            enabled: true,
         });
     });
 
-    test('creates http server config', async (t) => {
-        await withManager(t.name, async (_manager) => {
-            const config = MCPConfigManager.create('test', 'http', 'http://example.com');
-            deepStrictEqual(config, {
-                name: 'test',
-                transport: 'http',
-                url: 'http://example.com',
-                enabled: true,
-            });
+    test('creates http server config', async () => {
+        const config = MCPConfigManager.create('test', 'http', 'http://example.com');
+        deepStrictEqual(config, {
+            name: 'test',
+            transport: 'http',
+            url: 'http://example.com',
+            enabled: true,
         });
     });
 
-    test('includes environment variables', async (t) => {
-        await withManager(t.name, async (_manager) => {
-            const env = new Map([['API_KEY', 'secret']]);
-            const config = MCPConfigManager.create('test', 'stdio', 'node', [], env);
-            deepStrictEqual(config.env, env);
-        });
+    test('includes environment variables', async () => {
+        const env = new Map([['API_KEY', 'secret']]);
+        const config = MCPConfigManager.create('test', 'stdio', 'node', [], env);
+        deepStrictEqual(config.env, env);
     });
 
-    test('respects enabled flag', async (t) => {
-        await withManager(t.name, async (_manager) => {
-            const config = MCPConfigManager.create('test', 'stdio', 'node', [], undefined, false);
-            strictEqual(config.enabled, false);
-        });
+    test('respects enabled flag', async () => {
+        const config = MCPConfigManager.create('test', 'stdio', 'node', [], undefined, false);
+        strictEqual(config.enabled, false);
     });
-});
 
-describe('isValidConfig', () => {
     test('validates correct stdio config', async (t) => {
         await withManager(t.name, async (manager) => {
             const config = MCPConfigManager.create('test', 'stdio', 'node');
-            ok(manager.isValidConfig(config));
+            ok(manager.isValidServer(config));
         });
     });
 
     test('validates correct sse config', async (t) => {
         await withManager(t.name, async (manager) => {
             const config = MCPConfigManager.create('test', 'sse', 'http://example.com');
-            ok(manager.isValidConfig(config));
+            ok(manager.isValidServer(config));
         });
     });
 
     test('rejects invalid config', async (t) => {
         await withManager(t.name, async (manager) => {
-            ok(!manager.isValidConfig({ invalid: 'config' }));
+            ok(!manager.isValidServer({ invalid: 'config' }));
         });
     });
 
     test('rejects missing required fields', async (t) => {
         await withManager(t.name, async (manager) => {
-            ok(!manager.isValidConfig({ name: 'test' }));
+            ok(!manager.isValidServer({ name: 'test' }));
         });
     });
-});
 
-describe('CRUD operations', () => {
     test('getAllServers returns builtin server for default config', async (t) => {
         await withManager(t.name, async (manager) => {
             const servers = await manager.getAllServers();
@@ -320,9 +285,7 @@ describe('CRUD operations', () => {
             strictEqual(exists, false);
         });
     });
-});
 
-describe('enabled/disabled servers', () => {
     test('getEnabledServers returns only enabled servers', async (t) => {
         await withManager(t.name, async (manager) => {
             const enabled1 = MCPConfigManager.create('enabled1', 'stdio', 'node', [], undefined, true);
@@ -375,9 +338,7 @@ describe('enabled/disabled servers', () => {
             ok(error?.message.includes('not found'));
         });
     });
-});
 
-describe('multiple servers', () => {
     test('handles multiple servers correctly', async (t) => {
         await withManager(t.name, async (manager) => {
             const servers = [
@@ -416,9 +377,7 @@ describe('multiple servers', () => {
             strictEqual(nonBuiltinServers[1].name, 'c-server');
         });
     });
-});
 
-describe('event emitter', () => {
     test('emits config:changed event on upsertServer (add)', async (t) => {
         await withManager(t.name, async (manager) => {
             // Watcher is automatically started in constructor
@@ -432,7 +391,7 @@ describe('event emitter', () => {
             await manager.upsertServer(serverConfig);
 
             // Wait for file watcher to detect the change
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await sleep(2);
 
             ok(eventFired);
         });
@@ -454,7 +413,7 @@ describe('event emitter', () => {
             await manager.upsertServer(serverConfig2);
 
             // Wait for file watcher to detect the change
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await sleep(2);
 
             ok(eventFired);
         });
@@ -475,7 +434,7 @@ describe('event emitter', () => {
             await manager.removeServer('test');
 
             // Wait for file watcher to detect the change
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await sleep(2);
 
             ok(eventFired);
         });
@@ -488,7 +447,6 @@ describe('event emitter', () => {
 
             // Watcher is automatically started in constructor
             let eventFired = 0;
-
             manager.on('config:changed', () => {
                 eventFired++;
             });
@@ -496,8 +454,7 @@ describe('event emitter', () => {
             await manager.enable('test', false);
 
             // Wait for file watcher to detect the change
-            await new Promise((resolve) => setTimeout(resolve, 200));
-
+            await sleep(2);
             strictEqual(eventFired, 1);
         });
     });
@@ -509,30 +466,19 @@ describe('event emitter', () => {
                 eventFired++;
             });
 
-            // Create initial server >> fire once
+            // Create initial server >> fire first
             const serverConfig = MCPConfigManager.create('initial', 'stdio', 'node');
             await manager.upsertServer(serverConfig);
 
             // Wait for first event to complete
-            await new Promise((resolve) => setTimeout(resolve, 20));
+            await sleep(2);
 
-            // Simulate external file change by writing directly to the file
-            const fs = await import('node:fs/promises');
-            const config = await manager.readConfig();
-            config.mcpServers.set('external', {
-                name: 'external',
-                transport: 'stdio',
-                command: 'external',
-                args: [],
-                env: new Map(),
-                enabled: true,
-                description: '',
-            });
+            // Simulate external file change by writing directly >> fire second
             const configPath = Object(manager)._configPath as string;
-            await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+            await fs.writeFile(configPath, JSON.stringify({ test: true }, null, 2), 'utf-8');
 
             // Wait for file watcher to detect the change (increased timeout for reliability)
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await sleep(2);
 
             // Verify event was fired (at least 2 events: initial upsert + external change)
             ok(eventFired >= 2, `Expected at least 2 events, got ${eventFired}`);
@@ -540,13 +486,7 @@ describe('event emitter', () => {
     });
 
     test('does not start file watcher when watch=false', async (t) => {
-        const testPath = getTestConfigPath(t.name);
-
-        // Clean up any existing files
-        if (existsSync(testPath)) unlinkSync(testPath);
-        if (existsSync(`${testPath}.backup`)) unlinkSync(`${testPath}.backup`);
-
-        const manager = new MCPConfigManager(testPath, false);
+        const manager = new MCPConfigManager(t.name, false);
 
         try {
             let eventFired = 0;
@@ -559,19 +499,16 @@ describe('event emitter', () => {
             await manager.upsertServer(serverConfig);
 
             // Wait to ensure no events fire from file watching
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            await sleep(2);
 
             // Verify no watch events fired (only the direct modification events count)
             // Since we're not watching, external file changes won't trigger events
             strictEqual(eventFired, 0, 'No config:changed events should fire when watch=false');
 
             // Verify the manager still works normally for direct operations
-            const config = await manager.readConfig();
+            const config = await manager.read();
             ok(config.mcpServers.has('test-server'), 'Server should be added');
         } finally {
-            // Cleanup test files
-            if (existsSync(testPath)) unlinkSync(testPath);
-            if (existsSync(`${testPath}.backup`)) unlinkSync(`${testPath}.backup`);
         }
     });
 });

@@ -37,14 +37,14 @@ describe('SSESession', () => {
             const session = await client.fetch<SSESession>('/sse');
 
             // Wait for session ID to be parsed
-            await sleep(200);
+            await sleep(2);
 
             strictEqual(session.sessionId, 'test123', 'Session ID should be parsed from endpoint event');
             strictEqual(session.endpoint, '/messages?session_id=test123', 'Endpoint should be stored');
             strictEqual(fn.mock.calls.length, 1, 'fetch should be called once');
 
             session.close();
-            await sleep(50);
+            await sleep(2);
         } finally {
             mock.reset();
         }
@@ -60,8 +60,8 @@ describe('SSESession', () => {
                 // Delay sending data to allow event listeners to be registered
                 setTimeout(() => {
                     controller.enqueue(new TextEncoder().encode(sseData));
-                    setTimeout(() => controller.close(), 100);
-                }, 50);
+                    setTimeout(() => controller.close(), 5);
+                }, 2);
             },
         });
 
@@ -87,8 +87,8 @@ describe('SSESession', () => {
             session.addEventListener('sse:message', handler as EventListener);
             session.addEventListener('sse:endpoint', handler as EventListener);
 
-            // Wait for events to be processed
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            // Wait for events to be processed (stream sends after 2ms, closes after 5ms)
+            await sleep(10);
 
             ok(events.length >= 2, 'Should receive endpoint and message events');
             strictEqual(events[0].event, 'endpoint');
@@ -102,19 +102,18 @@ describe('SSESession', () => {
         }
     });
 
-    test('should parse various SSE data formats', async () => {
-        // Test 1: JSON data
-        let sseData = 'data: {"type":"test","value":42}\n\n';
-        let stream = new ReadableStream({
+    test('should parse SSE JSON data', async () => {
+        const sseData = 'data: {"type":"test","value":42}\n\n';
+        const stream = new ReadableStream({
             start(controller) {
                 setTimeout(() => {
                     controller.enqueue(new TextEncoder().encode(sseData));
-                    setTimeout(() => controller.close(), 100);
-                }, 50);
+                }, 2);
+                setTimeout(() => controller.close(), 5);
             },
         });
 
-        let fn = mock.method(globalThis, 'fetch', async () => {
+        const fn = mock.method(globalThis, 'fetch', async () => {
             return new Response(stream, {
                 status: 200,
                 headers: { 'Content-Type': 'text/event-stream' },
@@ -133,7 +132,7 @@ describe('SSESession', () => {
             };
 
             session.addEventListener('sse:message', handler as EventListener);
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await sleep(10);
 
             deepStrictEqual(receivedData, { type: 'test', value: 42 }, 'Should parse JSON data');
             strictEqual(fn.mock.calls.length, 1, 'fetch should be called once');
@@ -141,19 +140,20 @@ describe('SSESession', () => {
         } finally {
             mock.reset();
         }
+    });
 
-        // Test 2: Non-JSON data as string
-        sseData = 'data: plain text message\n\n';
-        stream = new ReadableStream({
+    test('should parse SSE non-JSON string data', async () => {
+        const sseData = 'data: plain text message\n\n';
+        const stream = new ReadableStream({
             start(controller) {
                 setTimeout(() => {
                     controller.enqueue(new TextEncoder().encode(sseData));
-                    setTimeout(() => controller.close(), 100);
-                }, 50);
+                }, 2);
+                setTimeout(() => controller.close(), 5);
             },
         });
 
-        fn = mock.method(globalThis, 'fetch', async () => {
+        const fn = mock.method(globalThis, 'fetch', async () => {
             return new Response(stream, {
                 status: 200,
                 headers: { 'Content-Type': 'text/event-stream' },
@@ -172,7 +172,7 @@ describe('SSESession', () => {
             };
 
             session.addEventListener('sse:message', handler as EventListener);
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await sleep(10);
 
             strictEqual(receivedData, 'plain text message', 'Should handle non-JSON as string');
             strictEqual(fn.mock.calls.length, 1, 'fetch should be called once');
@@ -180,19 +180,20 @@ describe('SSESession', () => {
         } finally {
             mock.reset();
         }
+    });
 
-        // Test 3: Multi-line data
-        sseData = 'data: line1\ndata: line2\ndata: line3\n\n';
-        stream = new ReadableStream({
+    test('should parse SSE multi-line data', async () => {
+        const sseData = 'data: line1\ndata: line2\ndata: line3\n\n';
+        const stream = new ReadableStream({
             start(controller) {
                 setTimeout(() => {
                     controller.enqueue(new TextEncoder().encode(sseData));
-                    setTimeout(() => controller.close(), 100);
-                }, 50);
+                }, 2);
+                setTimeout(() => controller.close(), 5);
             },
         });
 
-        fn = mock.method(globalThis, 'fetch', async () => {
+        const fn = mock.method(globalThis, 'fetch', async () => {
             return new Response(stream, {
                 status: 200,
                 headers: { 'Content-Type': 'text/event-stream' },
@@ -211,7 +212,7 @@ describe('SSESession', () => {
             };
 
             session.addEventListener('sse:message', handler as EventListener);
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await sleep(10);
 
             strictEqual(receivedData, 'line1line2line3', 'Multi-line data should be concatenated');
             strictEqual(fn.mock.calls.length, 1, 'fetch should be called once');
@@ -243,7 +244,7 @@ describe('SSESession', () => {
             const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 5000, maxTries: 0 });
             const session = await client.fetch<SSESession>('/sse');
 
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await sleep(2);
 
             strictEqual(session.connected, true, 'Session should be connected');
             strictEqual(session.closed, false, 'Session should not be closed initially');
@@ -278,10 +279,10 @@ describe('SSESession', () => {
             };
 
             session.addEventListener('disconnected', handler);
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(1);
 
             session.close();
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(1);
 
             strictEqual(disconnectedEmitted, true, 'Disconnected event should be emitted');
             strictEqual(session.closed, true, 'Session should be marked as closed');
@@ -310,7 +311,7 @@ describe('SSESession', () => {
             const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 5000, maxTries: 0 });
             const session = await client.fetch<SSESession>('/sse');
 
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            await sleep(1);
 
             session.close();
 
@@ -330,19 +331,18 @@ describe('SSESession', () => {
 
     test('should send JSON-RPC request and wait for response', async () => {
         const requestId = Date.now();
+        let sendResponse: (() => void) | undefined;
+
         const stream = new ReadableStream({
             start(controller) {
-                // Delay all data to allow listener registration
-                setTimeout(() => {
-                    // Send endpoint first
-                    controller.enqueue(new TextEncoder().encode('event: endpoint\ndata: /messages?session_id=xyz\n\n'));
-                    // Then send response after another delay
-                    setTimeout(() => {
-                        const response = `data: ${JSON.stringify({ jsonrpc: '2.0', id: requestId, result: { success: true } })}\n\n`;
-                        controller.enqueue(new TextEncoder().encode(response));
-                        setTimeout(() => controller.close(), 100);
-                    }, 200);
-                }, 50);
+                // Send endpoint immediately
+                controller.enqueue(new TextEncoder().encode('event: endpoint\ndata: /messages?session_id=xyz\n\n'));
+
+                // Set up callback to send response when requested
+                sendResponse = () => {
+                    const response = `data: ${JSON.stringify({ jsonrpc: '2.0', id: requestId, result: { success: true } })}\n\n`;
+                    controller.enqueue(new TextEncoder().encode(response));
+                };
             },
         });
 
@@ -350,6 +350,8 @@ describe('SSESession', () => {
         const _fn = mock.method(globalThis, 'fetch', async (_input: string, init?: RequestInit) => {
             if (init?.method === 'POST') {
                 postCallCount++;
+                // Trigger response when POST is made
+                setTimeout(() => sendResponse?.(), 1);
                 return new Response(null, { status: 202 }); // SSE returns 202 Accepted
             }
             return new Response(stream, {
@@ -362,8 +364,17 @@ describe('SSESession', () => {
             const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 5000, maxTries: 0 });
             const session = await client.fetch<SSESession>('/sse');
 
-            // Wait for endpoint to be set
-            await new Promise((resolve) => setTimeout(resolve, 250));
+            // Wait for endpoint event to be processed
+            await new Promise<void>((resolve) => {
+                const checkEndpoint = () => {
+                    if ((session as any)._endpoint) {
+                        resolve();
+                    } else {
+                        setTimeout(checkEndpoint, 1);
+                    }
+                };
+                checkEndpoint();
+            });
 
             // Mock Date.now to return consistent request ID
             const originalDateNow = Date.now;
@@ -410,7 +421,7 @@ describe('SSESession', () => {
             const session = await client.fetch<SSESession>('/sse');
 
             // Wait for connection
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await sleep(2);
 
             const events: Array<{ event: string; data: unknown }> = [];
 
@@ -425,7 +436,7 @@ describe('SSESession', () => {
             })();
 
             // Send messages after iterator is listening
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            await sleep(1);
             sendMessages?.();
 
             // Wait for iterator with timeout
@@ -443,7 +454,7 @@ describe('SSESession', () => {
             strictEqual(fn.mock.calls.length, 1, 'fetch should be called once');
 
             session.close();
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(1);
         } finally {
             mock.reset();
         }
@@ -453,9 +464,10 @@ describe('SSESession', () => {
         const stream = new ReadableStream({
             start(controller) {
                 controller.enqueue(new TextEncoder().encode('event: endpoint\ndata: /msg?session_id=test\n\n'));
+                // Error immediately after sending endpoint
                 setTimeout(() => {
                     controller.error(new Error('Stream error'));
-                }, 100);
+                }, 1);
             },
         });
 
@@ -470,19 +482,17 @@ describe('SSESession', () => {
             const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 5000, maxTries: 0 });
             const session = await client.fetch<SSESession>('/sse');
 
-            let errorEmitted = false;
-            session.addEventListener('error', () => {
-                errorEmitted = true;
+            // Wait for error event using a promise
+            const errorPromise = new Promise<void>((resolve) => {
+                session.addEventListener('error', () => {
+                    resolve();
+                });
             });
 
-            // Wait for stream error
-            await new Promise((resolve) => setTimeout(resolve, 200));
-
-            ok(errorEmitted, 'Error event should be emitted');
+            await errorPromise;
             strictEqual(fn.mock.calls.length, 1, 'fetch should be called once');
 
             session.close();
-            await new Promise((resolve) => setTimeout(resolve, 50));
         } finally {
             mock.reset();
         }
@@ -507,7 +517,7 @@ describe('SSESession', () => {
             const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 5000, maxTries: 0 });
             const session = await client.fetch<SSESession>('/sse');
 
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            await sleep(1);
 
             await rejects(
                 async () => session.sendRequest('test.method'),
@@ -517,7 +527,7 @@ describe('SSESession', () => {
             strictEqual(fn.mock.calls.length, 1, 'fetch should be called once');
 
             session.close();
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(1);
         } finally {
             mock.reset();
         }
@@ -556,7 +566,7 @@ describe('SSESession', () => {
             const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 5000, maxTries: 0 });
             const session = await client.fetch<SSESession>('/sse');
 
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await sleep(2);
 
             const originalDateNow = Date.now;
             mock.method(Date, 'now', () => 0);
@@ -567,7 +577,7 @@ describe('SSESession', () => {
             Date.now = originalDateNow;
 
             session.close();
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(1);
         } finally {
             mock.reset();
         }
@@ -607,7 +617,7 @@ describe('SSESession', () => {
             const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 5000, maxTries: 0 });
             const session = await client.fetch<SSESession>('/sse');
 
-            await new Promise((resolve) => setTimeout(resolve, 150));
+            await sleep(2);
 
             const originalDateNow = Date.now;
             mock.method(Date, 'now', () => 0);
@@ -622,7 +632,7 @@ describe('SSESession', () => {
             Date.now = originalDateNow;
 
             session.close();
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(1);
         } finally {
             mock.reset();
         }
@@ -646,7 +656,7 @@ describe('SSESession', () => {
             const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 5000, maxTries: 0 });
             const session = await client.fetch<SSESession>('/sse');
 
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await sleep(2);
 
             await rejects(
                 async () => session.sendRequest<{ result: string }>('test.method'),
@@ -656,7 +666,7 @@ describe('SSESession', () => {
             strictEqual(fn.mock.calls.length, 2, 'fetch should be called twice (SSE + POST)');
 
             session.close();
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(1);
         } finally {
             mock.reset();
         }
@@ -677,13 +687,13 @@ describe('SSESession', () => {
             const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 5000, maxTries: 0 });
             const session = await client.fetch<SSESession>('/sse');
 
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await sleep(2);
 
             strictEqual(session.sessionId, 'json-session-123', 'Session ID should be parsed from JSON object');
             strictEqual(fn.mock.calls.length, 1, 'fetch should be called once');
 
             session.close();
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(1);
         } finally {
             mock.reset();
         }
@@ -712,14 +722,14 @@ describe('SSESession', () => {
             const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 5000, maxTries: 0 });
             const session = await client.fetch<SSESession>('/sse');
 
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await sleep(2);
 
             const result = await session.sendRequest<{ result: string }>('test.method');
             deepStrictEqual(result, { result: 'direct-response' }, 'Should return direct JSON response');
             strictEqual(fn.mock.calls.length, 2, 'fetch should be called twice (SSE + POST)');
 
             session.close();
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(1);
         } finally {
             mock.reset();
         }
@@ -744,7 +754,7 @@ describe('SSESession', () => {
             // Use static fetch
             const session = await ResilientClient.fetch<SSESession>('http://test.local/sse', {}, { afterFn: 'sse', maxTries: 0 });
 
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await sleep(2);
 
             const stats2 = ResilientClient.getPoolStats();
             strictEqual(stats2.size, 1, 'Pool should have 1 client');
@@ -753,7 +763,7 @@ describe('SSESession', () => {
             strictEqual(fn.mock.calls.length, 1, 'fetch should be called once');
 
             session.close();
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(1);
         } finally {
             mock.reset();
             ResilientClient.clearPool();
@@ -768,8 +778,8 @@ describe('SSESession', () => {
         });
 
         const fn = mock.method(globalThis, 'fetch', async () => {
-            // Delay response to exceed timeout
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            // Delay response to exceed timeout (10ms timeout, so delay 15ms)
+            await sleep(15);
             return new Response(stream, {
                 status: 200,
                 headers: { 'Content-Type': 'text/event-stream' },
@@ -777,20 +787,16 @@ describe('SSESession', () => {
         });
 
         try {
-            const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 50, maxTries: 0 });
+            const client = new ResilientClient('http://test.local', { afterFn: 'sse', timeout: 10, maxTries: 0 });
 
             await rejects(
                 async () => {
-                    const session = await client.fetch<SSESession>('/sse');
-                    await new Promise((resolve) => setTimeout(resolve, 100));
-                    return session;
+                    await client.fetch<SSESession>('/sse');
                 },
                 /Timeout|Aborted/,
                 'Should reject with timeout',
             );
             strictEqual(fn.mock.calls.length, 1, 'fetch should be called once');
-
-            await new Promise((resolve) => setTimeout(resolve, 200));
         } finally {
             mock.reset();
         }

@@ -19,7 +19,7 @@ describe('debounce', () => {
             callCount++;
         };
 
-        const debounced = debounce(fn, 100);
+        const debounced = debounce(fn, 10);
 
         // Call multiple times rapidly
         debounced();
@@ -30,7 +30,7 @@ describe('debounce', () => {
         strictEqual(callCount, 0);
 
         // Wait for debounce delay
-        await sleep(150);
+        await sleep(20);
 
         // Function should have been called once
         strictEqual(callCount, 1);
@@ -42,10 +42,10 @@ describe('debounce', () => {
             receivedArg = arg;
         };
 
-        const debounced = debounce(fn, 50);
+        const debounced = debounce(fn, 10);
         debounced('test-value');
 
-        await sleep(100);
+        await sleep(20);
 
         strictEqual(receivedArg, 'test-value');
     });
@@ -56,7 +56,7 @@ describe('debounce', () => {
             callCount++;
         };
 
-        const debounced = debounce(fn); // No delay specified
+        const debounced = debounce(fn); // No delay specified, should use 300ms
         debounced();
 
         // Should not have been called after 200ms
@@ -64,7 +64,7 @@ describe('debounce', () => {
         strictEqual(callCount, 0);
 
         // Should have been called after 350ms (300 + buffer)
-        await sleep(200);
+        await sleep(150);
         strictEqual(callCount, 1);
     });
 
@@ -74,17 +74,17 @@ describe('debounce', () => {
             callCount++;
         };
 
-        const debounced = debounce(fn, 100);
+        const debounced = debounce(fn, 30);
 
         debounced();
-        await sleep(50); // Wait 50ms
+        await sleep(20); // Wait less than debounce delay
         debounced(); // This should cancel the first call
-        await sleep(50); // Wait another 50ms (total 100ms from first call)
+        await sleep(20); // Wait less than debounce delay again
 
         // First call should have been cancelled
         strictEqual(callCount, 0);
 
-        await sleep(100); // Wait for second call to complete
+        await sleep(40); // Wait for second call to complete (greater than debounce delay)
 
         // Only the second call should have executed
         strictEqual(callCount, 1);
@@ -96,16 +96,16 @@ describe('debounce', () => {
             calls.push(value);
         };
 
-        const debounced = debounce(fn, 50);
+        const debounced = debounce(fn, 10);
 
         debounced(1);
-        await sleep(100);
+        await sleep(20);
 
         debounced(2);
-        await sleep(100);
+        await sleep(20);
 
         debounced(3);
-        await sleep(100);
+        await sleep(20);
 
         // Should have three calls with correct values
         strictEqual(calls.length, 3);

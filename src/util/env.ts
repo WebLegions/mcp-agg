@@ -5,10 +5,9 @@ import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseEnv } from 'node:util';
 import * as worker from 'node:worker_threads';
+import { isDebugging } from './debugger';
 import type { Dict } from './immutable';
-import { createLogger, isDebuggerAttached, LogLevel } from './logger';
-
-type EnvValue = string | number | boolean;
+import { createLogger, LogLevel } from './logger';
 
 export class Env {
     static get runtime(): 'node' | 'bun' {
@@ -46,9 +45,6 @@ export class Env {
     }
     static get appVersion() {
         return Env.pkg.version;
-    }
-    static get isDebuggerAttached() {
-        return isDebuggerAttached();
     }
     static get podName() {
         return Env.get('POD_NAME', '');
@@ -124,7 +120,7 @@ export class Env {
             (argv.includes('-json') || argv.includes('--json')) && !(argv.includes('-raw') || argv.includes('--raw'))
                 ? 'json'
                 : 'raw';
-        env.NODE_TEST_CONTEXT ??= String(isDebuggerAttached());
+        env.NODE_TEST_CONTEXT ??= String(isDebugging());
         env.POD_NAME ??= '';
         env.POD_NAMESPACE ??= '';
     }
@@ -138,10 +134,11 @@ export class Env {
      * @param max - The maximum value for numeric keys.
      * @returns The value of the environment variable or the default value.
      */
-    static get(key: string, def: string, min?: string, max?: string): string;
     static get(key: string, def: number, min?: number, max?: number): number;
     static get(key: string, def: boolean): boolean;
-    static get<T extends EnvValue>(key: string, def: T, min?: EnvValue, max?: EnvValue): T {
+    static get<T extends object>(key: string, def: T): T;
+    static get(key: string, def: string, min?: string, max?: string): string;
+    static get<T = unknown>(key: string, def: T, min?: T, max?: T): T {
         const raw = process.env[key];
         let rc: unknown;
         switch (typeof def) {
@@ -159,17 +156,30 @@ export class Env {
                 } else {
                     rc = Number(raw);
                 }
-                if (typeof min === 'number' && (rc as number) < min) rc = min;
-                if (typeof max === 'number' && (rc as number) > max) rc = max;
+                if (typeof min === 'number' && (rc as number) < (min as number)) rc = min;
+                if (typeof max === 'number' && (rc as number) > (max as number)) rc = max;
                 rc = Number.isNaN(rc) ? 0 : rc;
                 break;
-            default:
+            case 'string': {
                 rc = String(raw ?? def ?? '');
-                min = String(min ?? '');
-                max = String(max ?? '');
-                if (min && (rc as string) < min) rc = min;
-                if (max && (rc as string) > max) rc = max;
+                const minStr = min !== undefined ? String(min) : '';
+                const maxStr = max !== undefined ? String(max) : '';
+                if (minStr && (rc as string) < minStr) rc = minStr;
+                if (maxStr && (rc as string) > maxStr) rc = maxStr;
+                break;
+            }
+            case 'object':
+                // If default is object, parse JSON from env var
+                if (raw !== undefined && def !== undefined) {
+                    try {
+                        rc = JSON.parse(raw);
+                    } catch {
+                        console.error(`Failed to parse JSON from env var ${key}`);
+                    }
+                }
+                break;
         }
+        rc ??= def;
         return rc as T;
     }
 
@@ -189,7 +199,6 @@ export class Env {
             nodeEnv,
             uvThreadpool,
             __dirname,
-            isDebuggerAttached,
         } = Env;
         log.info(`
 -----------------
@@ -201,7 +210,7 @@ euid: ${process.geteuid?.() ?? '-'} egid: ${process.getegid?.() ?? '-'},
 NODE_ENV: ${nodeEnv}, uv_threads: ${uvThreadpool}
 cwd: ${process.cwd()}, dirname: ${__dirname},
 namespace: ${podNamespace || '-'}, pod: ${podName || '-'},
-logLevel: ${LogLevel[save]}, isDebugging: ${isDebuggerAttached}, test: ${process.env.NODE_TEST_CONTEXT}
+logLevel: ${LogLevel[save]}, isDebugging: ${isDebugging()}, test: ${process.env.NODE_TEST_CONTEXT}
 -----------------`);
         log.conf.level = save;
     }

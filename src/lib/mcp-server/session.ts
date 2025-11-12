@@ -8,7 +8,7 @@ import { MCPServer } from './server';
 import type { ServerInfo } from './types';
 
 // Logger for session management
-const log = createLogger({ scope: 'mcp:session' });
+const log = createLogger('mcp:session');
 
 export interface SessionData {
     sessionId: string;

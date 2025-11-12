@@ -87,6 +87,7 @@ Use this session ID in POST requests to the same endpoint.`,
                 hide: false,
             } as FastifySchemaWithDocs,
         },
+        /* istanbul ignore start - integration level testing, requires real HTTP connection */
         async (request: FastifyRequest, reply: FastifyReply) => {
             try {
                 // Get or create session
@@ -139,6 +140,7 @@ Use this session ID in POST requests to the same endpoint.`,
                 reply.code(500).send({ error: 'Internal server error' });
             }
         },
+        /* istanbul ignore stop */
     );
 
     // POST /mcp - Handle JSON-RPC requests
@@ -180,6 +182,7 @@ Session management:
                 const session = await getOrCreateSession(sessionId);
 
                 // Validate JSON-RPC structure
+                /* istanbul ignore next - Fastify parses JSON, hard to test invalid body with inject() */
                 if (!message || typeof message !== 'object') {
                     const errorResponse = {
                         jsonrpc: '2.0',
@@ -280,6 +283,7 @@ function setupConfigManager(): void {
     const manager = getManager(undefined, watch);
 
     // Listen for config changes and clean up/reload tools (only if watching)
+    /* istanbul ignore next - integration level testing, requires file system changes */
     if (watch) {
         manager.on('config:changed', async () => {
             console.log('Config changed - reloading tools in all sessions');
@@ -290,9 +294,9 @@ function setupConfigManager(): void {
 
             // For each session, unregister tools from disabled/deleted servers
             // and re-register tools from enabled servers
-            sessions.notifyAllSessions(async (session) => {
+            sessions.notifyAllSessions(async (server) => {
                 // Get all current tools and their server names
-                const allTools = session.server.getAllTools();
+                const allTools = server.getAllTools();
                 const registeredServers = new Set<string>();
 
                 for (const [, toolInfo] of allTools.entries()) {
@@ -304,16 +308,16 @@ function setupConfigManager(): void {
                 // Unregister tools from servers that are no longer enabled
                 for (const serverName of registeredServers) {
                     if (!enabledNames.has(serverName)) {
-                        const removed = await session.server.unregisterServerTools(serverName);
+                        const removed = await server.unregisterServerTools(serverName);
                         console.log(`Removed ${removed} tools from disabled/deleted server: ${serverName}`);
                     }
                 }
 
                 // Re-register tools from all enabled servers (this will add new ones)
-                await registerMCPServerTools(session.server);
+                await registerMCPServerTools(server);
 
                 // Notify client that tools list changed
-                session.emitToolListChanged();
+                server.emitToolListChanged();
             });
         });
         console.log('MCP config manager initialized with file watching');

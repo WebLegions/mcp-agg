@@ -215,7 +215,7 @@ describe('SessionStore', () => {
     });
     test('createWithSharedServer() creates session with shared server instance', () => {
         // Create a mock server
-        const mockServer = { name: 'shared-server', version: '1.0.0' } as MCPServer;
+        const mockServer = { name: 'shared-server', version: '1.0.0' } as unknown as MCPServer;
 
         const session1 = store.createWithSharedServer(mockServer);
         const session2 = store.createWithSharedServer(mockServer);
@@ -231,7 +231,7 @@ describe('SessionStore', () => {
     });
 
     test('createWithSharedServer() accepts custom session ID', () => {
-        const mockServer = { name: 'test', version: '1.0.0' } as MCPServer;
+        const mockServer = { name: 'test', version: '1.0.0' } as unknown as MCPServer;
         const customId = 'custom-session-123';
 
         const session = store.createWithSharedServer(mockServer, customId);
@@ -241,7 +241,7 @@ describe('SessionStore', () => {
     });
 
     test('createWithSharedServer() accepts metadata', () => {
-        const mockServer = { name: 'test', version: '1.0.0' } as MCPServer;
+        const mockServer = { name: 'test', version: '1.0.0' } as unknown as MCPServer;
         const metadata = { userId: '456', context: 'test' };
 
         const session = store.createWithSharedServer(mockServer, undefined, metadata);

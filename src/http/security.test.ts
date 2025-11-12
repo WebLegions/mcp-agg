@@ -5,12 +5,10 @@ import { createServer, registerRoutes } from './server';
 
 describe('HTTP Security Middleware', () => {
     let app: FastifyInstance;
-    const testPort = 3001;
-    const baseUrl = `http://localhost:${testPort}`;
+    let baseUrl: string;
 
     beforeEach(async () => {
         // Set test environment variables
-        process.env.PORT = String(testPort);
         process.env.CORS_ALLOWED_ORIGINS = 'https://example.com';
         process.env.RATE_LIMIT_WINDOW_MS = '60000'; // 1 minute
         process.env.RATE_LIMIT_MAX_REQUESTS = '5';
@@ -20,7 +18,10 @@ describe('HTTP Security Middleware', () => {
         // Create and start server
         app = createServer();
         await registerRoutes(app);
-        await app.listen({ port: testPort, host: '127.0.0.1' });
+        // Use PORT from env (set by test runner) or default to 3000
+        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
+        await app.listen({ port, host: '127.0.0.1' });
+        baseUrl = `http://localhost:${port}`;
     });
 
     afterEach(async () => {
@@ -166,28 +167,19 @@ describe('HTTP Security Middleware', () => {
             ok(response.headers.has('x-content-type-options'), `${endpoint} should have security headers`);
         }
     });
-});
-
-describe('DNS Rebinding Protection', () => {
-    let app: FastifyInstance;
-    const testPort = 3002;
-
-    afterEach(async () => {
-        if (app) {
-            await app.close();
-        }
-        // Clean up environment
-        delete process.env.ALLOWED_HOSTS;
-    });
 
     test('should block requests with disallowed Host header', async () => {
-        // Configure DNS rebinding protection
+        // Configure DNS rebinding protection for this test
+        const savedAllowedHosts = process.env.ALLOWED_HOSTS;
         process.env.ALLOWED_HOSTS = 'localhost,127.0.0.1';
-        process.env.PORT = String(testPort);
 
+        // Close and recreate server with new config
+        await app.close();
         app = createServer();
         await registerRoutes(app);
-        await app.listen({ port: testPort, host: '127.0.0.1' });
+        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
+        await app.listen({ port, host: '127.0.0.1' });
+        const testPort = port;
 
         // Request with malicious Host header
         const response = await fetch(`http://127.0.0.1:${testPort}/health`, {
@@ -200,64 +192,76 @@ describe('DNS Rebinding Protection', () => {
         const body = (await response.json()) as { error: string; message: string };
         strictEqual(body.error, 'Forbidden');
         strictEqual(body.message, 'Host header not allowed');
+
+        // Restore env
+        process.env.ALLOWED_HOSTS = savedAllowedHosts;
     });
 
     test('should allow requests with allowed Host header', async () => {
+        const savedAllowedHosts = process.env.ALLOWED_HOSTS;
         process.env.ALLOWED_HOSTS = 'localhost,127.0.0.1';
-        process.env.PORT = String(testPort);
 
+        await app.close();
         app = createServer();
         await registerRoutes(app);
-        await app.listen({ port: testPort, host: '127.0.0.1' });
+        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
+        await app.listen({ port, host: '127.0.0.1' });
 
         // Request with allowed Host header
-        const response = await fetch(`http://127.0.0.1:${testPort}/health`, {
+        const response = await fetch(`http://127.0.0.1:${port}/health`, {
             headers: {
                 Host: 'localhost',
             },
         });
 
         strictEqual(response.status, 200, 'Should allow request with allowed host');
+        process.env.ALLOWED_HOSTS = savedAllowedHosts;
     });
 
     test('should skip DNS rebinding protection when not configured', async () => {
-        // Do not set ALLOWED_HOSTS
-        process.env.PORT = String(testPort);
+        const savedAllowedHosts = process.env.ALLOWED_HOSTS;
+        delete process.env.ALLOWED_HOSTS;
 
+        await app.close();
         app = createServer();
         await registerRoutes(app);
-        await app.listen({ port: testPort, host: '127.0.0.1' });
+        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
+        await app.listen({ port, host: '127.0.0.1' });
 
         // Request with any Host header should be allowed when protection is disabled
-        const response = await fetch(`http://127.0.0.1:${testPort}/health`, {
+        const response = await fetch(`http://127.0.0.1:${port}/health`, {
             headers: {
                 Host: 'any-random-host.com',
             },
         });
 
         strictEqual(response.status, 200, 'Should allow all hosts when ALLOWED_HOSTS is not configured');
+        process.env.ALLOWED_HOSTS = savedAllowedHosts;
     });
 
     test('should handle multiple allowed hosts', async () => {
+        const savedAllowedHosts = process.env.ALLOWED_HOSTS;
         process.env.ALLOWED_HOSTS = 'localhost,127.0.0.1,example.local';
-        process.env.PORT = String(testPort);
 
+        await app.close();
         app = createServer();
         await registerRoutes(app);
-        await app.listen({ port: testPort, host: '127.0.0.1' });
+        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
+        await app.listen({ port, host: '127.0.0.1' });
 
         // Test each allowed host
         for (const host of ['localhost', '127.0.0.1', 'example.local']) {
-            const response = await fetch(`http://127.0.0.1:${testPort}/health`, {
+            const response = await fetch(`http://127.0.0.1:${port}/health`, {
                 headers: { Host: host },
             });
             strictEqual(response.status, 200, `Should allow ${host}`);
         }
 
         // Test disallowed host
-        const badResponse = await fetch(`http://127.0.0.1:${testPort}/health`, {
+        const badResponse = await fetch(`http://127.0.0.1:${port}/health`, {
             headers: { Host: 'evil.com' },
         });
         strictEqual(badResponse.status, 403, 'Should block disallowed host');
+        process.env.ALLOWED_HOSTS = savedAllowedHosts;
     });
 });

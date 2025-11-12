@@ -418,3 +418,163 @@ describe('MCP API - New Features', () => {
     // because it's a long-lived connection. Manual testing or integration
     // tests with real HTTP client are needed for SSE stream validation.
 });
+
+describe('MCP API - Error handling', () => {
+    test('POST /mcp with empty object body returns 400', async () => {
+        const response = await app.inject({
+            method: 'POST',
+            url: '/mcp',
+            payload: {},
+        });
+
+        strictEqual(response.statusCode, 400);
+        const json = response.json();
+        strictEqual(json.jsonrpc, '2.0');
+        ok(json.error);
+        strictEqual(json.error.code, -32600);
+        ok(json.error.message.includes('Invalid Request') || json.error.message.includes('Invalid JSON-RPC'));
+    });
+
+    test('POST /mcp with array body returns 400', async () => {
+        const response = await app.inject({
+            method: 'POST',
+            url: '/mcp',
+            payload: [],
+        });
+
+        strictEqual(response.statusCode, 400);
+        const json = response.json();
+        strictEqual(json.jsonrpc, '2.0');
+        ok(json.error);
+        strictEqual(json.error.code, -32600);
+    });
+
+    test('POST /mcp SSE mode with empty object body returns 400', async () => {
+        const response = await app.inject({
+            method: 'POST',
+            url: '/mcp',
+            headers: {
+                accept: 'text/event-stream',
+            },
+            payload: {},
+        });
+
+        strictEqual(response.statusCode, 400);
+        ok(response.headers['content-type']?.includes('text/event-stream'));
+        ok(response.headers['mcp-session-id']);
+
+        // Parse SSE response
+        const body = response.body;
+        ok(body.includes('data: '));
+        const dataMatch = body.match(/data: (.+)\n/);
+        ok(dataMatch);
+        const json = JSON.parse(dataMatch[1]);
+        strictEqual(json.jsonrpc, '2.0');
+        ok(json.error);
+        strictEqual(json.error.code, -32600);
+    });
+
+    test('POST /mcp SSE mode with invalid JSON-RPC version returns 400', async () => {
+        const response = await app.inject({
+            method: 'POST',
+            url: '/mcp',
+            headers: {
+                accept: 'text/event-stream',
+            },
+            payload: {
+                jsonrpc: '1.0',
+                id: 300,
+                method: 'tools/list',
+            },
+        });
+
+        strictEqual(response.statusCode, 400);
+        ok(response.headers['content-type']?.includes('text/event-stream'));
+
+        // Parse SSE response
+        const body = response.body;
+        const dataMatch = body.match(/data: (.+)\n/);
+        ok(dataMatch);
+        const json = JSON.parse(dataMatch[1]);
+        strictEqual(json.jsonrpc, '2.0');
+        ok(json.error);
+        ok(json.error.message.includes('Invalid JSON-RPC version'));
+    });
+
+    test('POST /mcp with notification (no id) returns 204', async () => {
+        const response = await app.inject({
+            method: 'POST',
+            url: '/mcp',
+            payload: {
+                jsonrpc: '2.0',
+                method: 'notifications/initialized',
+            },
+        });
+
+        strictEqual(response.statusCode, 204);
+    });
+});
+
+describe('MCP API - Session management', () => {
+    test('POST /mcp reuses existing session when session ID provided', async () => {
+        // First request creates a session
+        const response1 = await app.inject({
+            method: 'POST',
+            url: '/mcp',
+            payload: {
+                jsonrpc: '2.0',
+                id: 400,
+                method: 'initialize',
+                params: {
+                    protocolVersion: '2024-11-05',
+                    capabilities: {},
+                    clientInfo: {
+                        name: 'test-client',
+                        version: '1.0.0',
+                    },
+                },
+            },
+        });
+
+        const sessionId = response1.headers['mcp-session-id'] as string;
+        ok(sessionId);
+
+        // Second request with same session ID
+        const response2 = await app.inject({
+            method: 'POST',
+            url: '/mcp',
+            headers: {
+                'mcp-session-id': sessionId,
+            },
+            payload: {
+                jsonrpc: '2.0',
+                id: 401,
+                method: 'tools/list',
+            },
+        });
+
+        strictEqual(response2.statusCode, 200);
+        strictEqual(response2.headers['mcp-session-id'], sessionId);
+
+        // Third request with same session ID
+        const response3 = await app.inject({
+            method: 'POST',
+            url: '/mcp',
+            headers: {
+                'mcp-session-id': sessionId,
+            },
+            payload: {
+                jsonrpc: '2.0',
+                id: 402,
+                method: 'tools/call',
+                params: {
+                    name: 'builtin:health',
+                    arguments: {},
+                },
+            },
+        });
+
+        strictEqual(response3.statusCode, 200);
+        strictEqual(response3.headers['mcp-session-id'], sessionId);
+    });
+});

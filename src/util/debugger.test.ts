@@ -6,7 +6,7 @@ import { strictEqual } from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { isDebugging } from './debugger';
 
-describe('isDebuggerAttached', () => {
+describe('isDebugging', () => {
     test('returns a boolean value', () => {
         const result = isDebugging();
         strictEqual(typeof result, 'boolean', 'Should return a boolean');

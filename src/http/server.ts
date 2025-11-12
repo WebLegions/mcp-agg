@@ -1,3 +1,5 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import { type Provider, schemaCompiler } from '../lib/validator';
 import { Env } from '../util/env';
@@ -10,6 +12,7 @@ import { registerMCP } from './mcp';
 import { registerSecurityPlugins } from './security';
 import { registerStatic } from './static';
 import { registerSwagger } from './swagger';
+import { registerTranspile } from './transpile';
 
 /**
  * Create and configure Fastify server instance
@@ -67,6 +70,14 @@ export async function registerRoutes(app: ReturnType<typeof createServer>) {
     registerMCP(app);
     registerConfig(app); // MCP server configuration CRUD API
 
+    // Register transpile routes (before static to handle frontend paths)
+    const currentDir = dirname(fileURLToPath(import.meta.url));
+    const frontendDir = join(currentDir, '..', 'frontend');
+
+    registerTranspile(app, join(frontendDir, 'components'), '/public/components');
+    registerTranspile(app, join(frontendDir, 'util'), '/public/util');
+    registerTranspile(app, join(frontendDir, 'app'), '/public/app');
+
     // Register static file serving (must be last to avoid route conflicts)
     await registerStatic(app);
 }
@@ -85,6 +96,10 @@ export async function startServer(app: ReturnType<typeof createServer>) {
         console.log(`Swagger UI: http://${host}:${port}/api/v1/swagger`);
     } catch (err) {
         console.error('Error starting server:', err);
+        // In test mode (NODE_TEST_CONTEXT set), throw error instead of exiting
+        if (process.env.NODE_TEST_CONTEXT) {
+            throw err;
+        }
         process.exit(1);
     }
 }

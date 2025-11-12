@@ -3,6 +3,7 @@
  * Manages a pool of MCP client connections with reference counting
  */
 
+import { ErrorEx } from '../../util';
 import type { MCPClient } from './client';
 
 /**
@@ -20,7 +21,7 @@ class MCPConnectionPool extends Map<string, MCPClient> {
                 await connection.close();
                 console.log(`Closed MCP connection: ${name}`);
             } catch (error) {
-                console.warn(`Failed to close MCP connection ${name}:`, error);
+                console.error(`Failed to close MCP connection ${name}:`, new ErrorEx(error));
             }
         }
         this.clear();

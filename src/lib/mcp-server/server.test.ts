@@ -1,6 +1,7 @@
 import { deepStrictEqual, equal, ok, strictEqual } from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { ErrorEx } from '../../util/error';
+import { sleep } from '../../util/sleep';
 import { MCPServer } from './server';
 import type {
     CancelledNotification,
@@ -68,7 +69,7 @@ describe('MCP Server - Cancellation', () => {
             },
             async () => {
                 // Simulate slow operation
-                await new Promise((resolve) => setTimeout(resolve, 100));
+                await sleep(100);
                 return { content: [{ type: 'text', text: 'Done' }], isError: false };
             },
             async () => {},

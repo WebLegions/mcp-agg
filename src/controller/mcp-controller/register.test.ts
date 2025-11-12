@@ -94,6 +94,7 @@ describe('register', () => {
             const config = {
                 name: 'test',
                 transport: 'unsupported' as never,
+                url: 'http://example.com',
                 enabled: true,
             };
 
@@ -223,6 +224,10 @@ describe('register', () => {
                 close: mock.fn(async () => undefined),
                 connect: mock.fn(async () => undefined),
                 refCount: 0,
+                connected: true,
+                addEventListener: mock.fn(() => undefined),
+                removeEventListener: mock.fn(() => undefined),
+                dispatchEvent: mock.fn(() => true),
             };
 
             // Add to connection pool

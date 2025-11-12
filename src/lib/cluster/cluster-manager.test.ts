@@ -2,6 +2,7 @@ import { ok, strictEqual, throws } from 'node:assert/strict';
 import cluster, { type Worker } from 'node:cluster';
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, test } from 'node:test';
+import { sleep } from '../../util/sleep';
 import { ClusterManager, type ClusterStats } from './cluster-manager';
 
 /**
@@ -74,7 +75,7 @@ describe.skip('ClusterManager', () => {
     });
 
     test('should accept custom configuration', async () => {
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const customLogger = createLogger('TestCluster', 'DEBUG');
 
         const manager = new ClusterManager({
@@ -192,14 +193,14 @@ describe.skip('ClusterManager', () => {
         strictEqual(stats1.recentRestarts, 0);
 
         // Wait for window to expire
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        await sleep(15);
 
         const stats2 = manager.getStats();
         strictEqual(stats2.recentRestarts, 0);
     });
 
     test('should handle configuration with all options', async () => {
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const customLogger = createLogger('TestCluster', 'DEBUG');
 
         const manager = new ClusterManager({
@@ -296,7 +297,7 @@ describe.skip('ClusterManager', () => {
         strictEqual(stats1.recentRestarts, 0);
 
         // Wait for window to pass
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        await sleep(15);
 
         const stats2 = manager.getStats();
         strictEqual(stats2.recentRestarts, 0);
@@ -412,7 +413,7 @@ describe.skip('ClusterManager', () => {
     });
 
     test('should use custom logger', async () => {
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const customLogger = createLogger('CustomCluster', 'DEBUG');
 
         const manager = new ClusterManager({
@@ -424,7 +425,7 @@ describe.skip('ClusterManager', () => {
     });
 
     test('should use different log levels', async () => {
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
 
         const loggers = [
             createLogger('Test1', 'DEBUG'),
@@ -469,7 +470,7 @@ describe.skip('ClusterManager', () => {
             return cluster;
         }) as typeof cluster.on;
 
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const manager = new ClusterManager({
             file: './worker.js',
             workers: 2,
@@ -480,7 +481,7 @@ describe.skip('ClusterManager', () => {
         await manager.startPrimary();
 
         // Wait for workers to come online
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(5);
 
         const stats = manager.getStats();
         strictEqual(stats.activeWorkers, 2, 'Should have 2 active workers');
@@ -510,7 +511,7 @@ describe.skip('ClusterManager', () => {
             return cluster;
         }) as typeof cluster.on;
 
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const manager = new ClusterManager({
             file: './worker.js',
             workers: 1,
@@ -519,7 +520,7 @@ describe.skip('ClusterManager', () => {
         });
 
         await manager.startPrimary();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(5);
 
         const statsBefore = manager.getStats();
         strictEqual(statsBefore.totalRestarts, 0);
@@ -529,7 +530,7 @@ describe.skip('ClusterManager', () => {
             exitHandler(forkedWorkers[0], 1, 'SIGTERM');
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(5);
 
         const statsAfter = manager.getStats();
         strictEqual(statsAfter.totalRestarts, 1, 'Should track restart');
@@ -568,7 +569,7 @@ describe.skip('ClusterManager', () => {
         }) as typeof process.exit;
 
         try {
-            const { createLogger } = await import('./logger');
+            const { createLogger } = await import('../../util/logger');
             const manager = new ClusterManager({
                 file: './worker.js',
                 workers: 1,
@@ -578,18 +579,18 @@ describe.skip('ClusterManager', () => {
             });
 
             await manager.startPrimary();
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            await sleep(5);
 
             // Kill worker twice to exceed limit
             if (exitHandler && forkedWorkers[0]) {
                 // First crash - will restart
                 exitHandler(forkedWorkers[0], 1, null);
-                await new Promise((resolve) => setTimeout(resolve, 50));
+                await sleep(5);
 
                 // Second crash - exceeds maxRestarts, no restart
                 if (forkedWorkers[1]) {
                     exitHandler(forkedWorkers[1], 1, null);
-                    await new Promise((resolve) => setTimeout(resolve, 50));
+                    await sleep(5);
                 }
             }
 
@@ -624,7 +625,7 @@ describe.skip('ClusterManager', () => {
             return cluster;
         }) as typeof cluster.on;
 
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const manager = new ClusterManager({
             file: './worker.js',
             workers: 1,
@@ -633,14 +634,14 @@ describe.skip('ClusterManager', () => {
         });
 
         await manager.startPrimary();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(5);
 
         // Simulate graceful exit (code 0)
         if (exitHandler && forkedWorkers[0]) {
             exitHandler(forkedWorkers[0], 0, null);
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(5);
 
         const stats = manager.getStats();
         strictEqual(stats.totalRestarts, 0, 'Should not count graceful exit as restart');
@@ -653,7 +654,7 @@ describe.skip('ClusterManager', () => {
             configurable: true,
         });
 
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const manager = new ClusterManager({
             file: './worker.js',
             logger: createLogger('TestCluster', 'ERROR'),
@@ -667,7 +668,7 @@ describe.skip('ClusterManager', () => {
     });
 
     test('should call shutdown() method when available', async () => {
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
 
         const manager = new ClusterManager({
             file: './__mocks__/simple-worker.ts',
@@ -708,7 +709,7 @@ describe.skip('ClusterManager', () => {
             return cluster;
         }) as typeof cluster.on;
 
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const manager = new ClusterManager({
             file: './worker.js',
             workers: 2,
@@ -717,7 +718,7 @@ describe.skip('ClusterManager', () => {
         });
 
         await manager.startPrimary();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(5);
 
         // Call shutdown and verify workers are disconnected
         const shutdownPromise = manager.shutdown();
@@ -765,7 +766,7 @@ describe.skip('ClusterManager', () => {
 
         cluster.on = (() => cluster) as typeof cluster.on;
 
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const manager = new ClusterManager({
             file: './worker.js',
             workers: 1,
@@ -774,13 +775,13 @@ describe.skip('ClusterManager', () => {
         });
 
         await manager.startPrimary();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(5);
 
         // Call shutdown and wait for timeout
         const _shutdownPromise = manager.shutdown();
 
         // Don't emit exit - let it timeout and force SIGKILL
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await sleep(20);
 
         ok(killedWorkers.length > 0, 'Should have force-killed workers after timeout');
     });
@@ -812,7 +813,7 @@ describe.skip('ClusterManager', () => {
             return cluster;
         }) as typeof cluster.on;
 
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const manager = new ClusterManager({
             file: './worker.js',
             workers: 1,
@@ -821,7 +822,7 @@ describe.skip('ClusterManager', () => {
         });
 
         await manager.startPrimary();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(5);
 
         // Shutdown should handle already-disconnected workers gracefully
         const shutdownPromise = manager.shutdown();
@@ -861,7 +862,7 @@ describe.skip('ClusterManager', () => {
 
         cluster.on = (() => cluster) as typeof cluster.on;
 
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const manager = new ClusterManager({
             file: './worker.js',
             workers: 1,
@@ -869,7 +870,7 @@ describe.skip('ClusterManager', () => {
         });
 
         await manager.startPrimary();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(5);
 
         ok(errorEmitted, 'Worker error event should have been emitted');
         ok(forkedWorkers.length >= 1, 'Worker should have been forked despite error');
@@ -897,7 +898,7 @@ describe.skip('ClusterManager', () => {
 
         cluster.on = (() => cluster) as typeof cluster.on;
 
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const manager = new ClusterManager({
             file: './worker.js',
             workers: 1,
@@ -905,7 +906,7 @@ describe.skip('ClusterManager', () => {
         });
 
         await manager.start();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await sleep(5);
 
         ok(forkedWorkers.length >= 1, 'Should have forked workers in primary mode');
     });
@@ -920,7 +921,7 @@ describe.skip('ClusterManager', () => {
             configurable: true,
         });
 
-        const { createLogger } = await import('./logger');
+        const { createLogger } = await import('../../util/logger');
         const manager = new ClusterManager({
             file: './non-existent-worker.js',
             logger: createLogger('TestCluster', 'ERROR'),

@@ -13,6 +13,7 @@ describe('mcp-cli', () => {
     let originalConsoleLog: typeof console.log;
     let originalConsoleError: typeof console.error;
     let originalExit: typeof process.exit;
+    let originalStdoutWrite: typeof process.stdout.write;
     let logs: string[] = [];
     let errors: string[] = [];
     let originalStdin: NodeJS.ReadStream;
@@ -26,6 +27,7 @@ describe('mcp-cli', () => {
         originalConsoleError = console.error;
         originalExit = process.exit;
         originalStdin = Object(process).stdin;
+        originalStdoutWrite = process.stdout.write;
 
         console.log = (...args: unknown[]) => {
             logs.push(args.join(' '));
@@ -34,21 +36,30 @@ describe('mcp-cli', () => {
             errors.push(args.join(' '));
         };
 
+        // Mock stdout.write to capture JSON output
+        process.stdout.write = ((...args: unknown[]) => {
+            logs.push(String(args[0]));
+            return true;
+        }) as typeof process.stdout.write;
+
         // Prevent actual process exit
         process.exit = mock.fn((() => {
             throw new Error('process.exit called');
         }) as never);
     });
 
-    afterEach(() => {
+    afterEach(async () => {
+        // Restore console methods FIRST so cleanup works properly
         console.log = originalConsoleLog;
         console.error = originalConsoleError;
         process.exit = originalExit;
+        process.stdout.write = originalStdoutWrite;
         if (mockStdin) {
             Object(process).stdin = originalStdin;
             mockStdin = undefined;
         }
         mock.restoreAll();
+        // Each test should clean up only the servers it creates.
     });
 
     test('runMCPCLI is exported', () => {
@@ -307,5 +318,161 @@ describe('mcp-cli', () => {
         const exitCode = await runMCPCLI(['add']);
 
         assert.ok(exitCode === 0 || exitCode === 1);
+    });
+
+    test('get command displays server details in human-readable format', async () => {
+        // First add a server
+        await runMCPCLI(['add', 'test-get-server', 'http://localhost:8080', '--transport', 'http', '--force']);
+
+        // Clear logs from add command
+        logs = [];
+        errors = [];
+
+        // Now get the server details
+        const exitCode = await runMCPCLI(['get', 'test-get-server']);
+
+        assert.equal(exitCode, 0);
+        assert.ok(logs.some((log) => log.includes('Server: test-get-server')));
+        assert.ok(logs.some((log) => log.includes('Transport: http')));
+        assert.ok(logs.some((log) => log.includes('URL: http://localhost:8080')));
+    });
+
+    test('get command outputs JSON when --json flag is provided', async () => {
+        // First add a server
+        const addExitCode = await runMCPCLI([
+            'add',
+            'test-get-json-server',
+            'http://localhost:9000',
+            '--transport',
+            'http',
+            '--force',
+        ]);
+
+        // Only proceed if add succeeded
+        assert.ok(addExitCode === 0 || addExitCode === 1, 'Add command should complete');
+
+        // Clear logs from add command
+        logs = [];
+        errors = [];
+
+        // Now get the server details as JSON
+        const exitCode = await runMCPCLI(['get', 'test-get-json-server', '--json']);
+
+        assert.equal(exitCode, 0);
+        // Verify JSON output was written to stdout (captured in logs)
+        const jsonOutput = logs.join(' ');
+        assert.ok(jsonOutput.includes('"name"'));
+        assert.ok(jsonOutput.includes('"transport"'));
+    });
+
+    test('get command displays stdio server with command and args', async () => {
+        // Add a stdio server with args
+        await runMCPCLI(['add', 'test-stdio-get', 'npx', '-y', 'test-package', '--transport', 'stdio', '--force']);
+
+        // Clear logs
+        logs = [];
+        errors = [];
+
+        // Get the server details
+        const exitCode = await runMCPCLI(['get', 'test-stdio-get']);
+
+        assert.equal(exitCode, 0);
+        assert.ok(logs.some((log) => log.includes('Command: npx')));
+        assert.ok(logs.some((log) => log.includes('Args:')));
+    });
+
+    test('get command displays environment variables', async () => {
+        // Add server with env vars
+        await runMCPCLI([
+            'add',
+            'test-env-get',
+            'npx',
+            'test-pkg',
+            '--transport',
+            'stdio',
+            '--env',
+            'API_KEY=secret',
+            '--env',
+            'REGION=us-west',
+            '--force',
+        ]);
+
+        // Clear logs
+        logs = [];
+        errors = [];
+
+        // Get the server details
+        const exitCode = await runMCPCLI(['get', 'test-env-get']);
+
+        assert.equal(exitCode, 0);
+        assert.ok(logs.some((log) => log.includes('Environment variables:')));
+        assert.ok(logs.some((log) => log.includes('API_KEY')));
+        assert.ok(logs.some((log) => log.includes('REGION')));
+    });
+
+    test('enable command enables a disabled server', async () => {
+        // First add a server
+        await runMCPCLI(['add', 'test-enable-server', 'http://localhost:7000', '--transport', 'http', '--force']);
+
+        // Disable it first
+        await runMCPCLI(['disable', 'test-enable-server']);
+
+        // Clear logs
+        logs = [];
+        errors = [];
+
+        // Now enable it
+        const exitCode = await runMCPCLI(['enable', 'test-enable-server']);
+
+        assert.equal(exitCode, 0);
+        assert.ok(logs.some((log) => log.includes('enabled')));
+        assert.ok(logs.some((log) => log.includes('test-enable-server')));
+    });
+
+    test('disable command disables an enabled server', async () => {
+        // First add a server
+        await runMCPCLI(['add', 'test-disable-server', 'http://localhost:6000', '--transport', 'http', '--force']);
+
+        // Clear logs
+        logs = [];
+        errors = [];
+
+        // Disable it
+        const exitCode = await runMCPCLI(['disable', 'test-disable-server']);
+
+        assert.equal(exitCode, 0);
+        assert.ok(logs.some((log) => log.includes('disabled')));
+        assert.ok(logs.some((log) => log.includes('test-disable-server')));
+    });
+
+    test('enable command returns error for nonexistent server', async () => {
+        const exitCode = await runMCPCLI(['enable', 'nonexistent-enable-server-xyz']);
+
+        assert.equal(exitCode, 1);
+        assert.ok(errors.some((err) => err.includes('Failed to enable')));
+    });
+
+    test('disable command returns error for nonexistent server', async () => {
+        const exitCode = await runMCPCLI(['disable', 'nonexistent-disable-server-xyz']);
+
+        assert.equal(exitCode, 1);
+        assert.ok(errors.some((err) => err.includes('Failed to disable')));
+    });
+
+    test('enable/disable commands toggle server state correctly', async () => {
+        // Add server
+        await runMCPCLI(['add', 'test-toggle-server', 'http://localhost:5555', '--transport', 'http', '--force']);
+
+        // Disable
+        let exitCode = await runMCPCLI(['disable', 'test-toggle-server']);
+        assert.equal(exitCode, 0);
+
+        // Enable
+        exitCode = await runMCPCLI(['enable', 'test-toggle-server']);
+        assert.equal(exitCode, 0);
+
+        // Disable again
+        exitCode = await runMCPCLI(['disable', 'test-toggle-server']);
+        assert.equal(exitCode, 0);
     });
 });

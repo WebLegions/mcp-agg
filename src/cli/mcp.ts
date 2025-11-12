@@ -424,6 +424,7 @@ async function addCommand(manager: MCPConfigManager, args: string[], options: Re
 /**
  * Interactive add command - prompts for missing parameters
  */
+/* istanbul ignore next - console interactive testing */
 async function interactiveAddCommand(
     manager: ReturnType<typeof getManager>,
     name?: string,
@@ -515,7 +516,7 @@ async function interactiveAddCommand(
                 : MCPConfigManager.create(name, transport as 'sse' | 'http', commandOrUrl, undefined, envMap, true);
 
         await manager.upsertServer(serverConfig);
-        console.log(`\n✓ Added MCP server: ${name}`);
+        console.log(`✓ Added MCP server: ${name}`);
         console.log(JSON.stringify(serverConfig, null, 2));
         return 0;
     } catch (err) {

@@ -3,11 +3,17 @@
  */
 
 import { strict as assert } from 'node:assert/strict';
-import { afterEach, describe, test } from 'node:test';
+import { afterEach, beforeEach, describe, test } from 'node:test';
+import { sleep } from '../../util/sleep';
+import { validators } from './client';
 import { StdioClient } from './stdio-client';
 
 describe('stdio-client', () => {
     const clients: StdioClient[] = [];
+
+    beforeEach(async () => {
+        await validators.init();
+    });
 
     afterEach(() => {
         // Clean up any clients that weren't explicitly closed
@@ -76,7 +82,7 @@ describe('stdio-client', () => {
         client.close();
 
         // Wait for process to exit
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await sleep(10);
 
         assert.equal(client.connected, false);
     });
@@ -133,7 +139,7 @@ describe('stdio-client', () => {
 
     test('accepts custom timeout and cwd options', () => {
         const client = new StdioClient('echo', [], {
-            timeout: 10000,
+            timeout: 10,
             cwd: '/tmp',
         });
 
@@ -161,7 +167,7 @@ describe('stdio-client', () => {
         }
 
         // Wait for error and disconnect events
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await sleep(20);
 
         assert.ok(errorEmitted || disconnectEmitted, 'Should emit error or disconnect event');
     });
@@ -170,19 +176,17 @@ describe('stdio-client', () => {
         const client = createClient('bun', ['--version']);
 
         let disconnected = false;
-        let exitCode: number | null = null;
+        let exitCode: number | undefined;
 
         client.addEventListener('disconnected', (e) => {
             disconnected = true;
-            if ('detail' in e && e.detail && typeof e.detail === 'object' && 'code' in e.detail) {
-                exitCode = (e.detail as { code: number | null }).code;
-            }
+            exitCode = Object(e).detail?.code;
         });
 
         await client.connect();
 
         // Wait for process to naturally exit after printing version
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await sleep(30);
 
         assert.equal(disconnected, true);
         assert.ok(exitCode !== undefined);

@@ -215,7 +215,7 @@ describe('safe', () => {
         ok(output.stdout.includes('test'), "Command output should contain 'test'");
     });
 
-    test.skip("readdir returns Buffer[] when encoding is 'buffer'", async () => {
+    test("readdir returns Buffer[] when encoding is 'buffer'", async () => {
         const [dir, dirErr] = await safe.mkdtemp(join(os.tmpdir(), `test-${Date.now()}-`));
         if (dirErr) throw dirErr;
 
@@ -228,7 +228,11 @@ describe('safe', () => {
             const [files, readdirErr] = await safe.readdir(dir, { encoding: 'buffer' });
             strictEqual(readdirErr, undefined);
             ok(Array.isArray(files));
-            ok(Buffer.isBuffer(files[0]));
+            // Bun returns Uint8Array for buffer encoding (Buffer extends Uint8Array)
+            ok(
+                files[0] instanceof Uint8Array || Buffer.isBuffer(files[0]),
+                'Should return Uint8Array (or Buffer) for buffer encoding',
+            );
         } finally {
             await deldir(dir);
         }

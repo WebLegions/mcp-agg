@@ -38,7 +38,6 @@ async function startWorker() {
 /**
  * Start cluster mode - only runs when this file is executed directly
  */
-/* istanbul ignore next */
 async function startCluster() {
     env.print();
 

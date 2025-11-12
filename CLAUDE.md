@@ -15,6 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - All the project config files (the files outside src) should not be changed without explicit developer approval.
 - Once you have some new functionality working well and you write a summary of the tasks status, you should git-stage the code to prevent it from getting lost. You should ask for the developer explicit permission if you want to revert to staged or revert to latest commit.
 - Suggest the user to commit the code after a set of functionality is passing.
+- If you're iterating on a task for over a minute, ask the user if you should continue working on the task.
 
 ### Coding patterns
 
@@ -66,12 +67,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Code Coverage**:
   - Automatically runs with `bun run test` command
   - Generates lcov.info in coverage/ directory for IDE integration
-  - Minimum 80% line coverage required. This is a hard requirement.
+  - Minimum 80% line coverage is required per code file. This is a hard requirement.
   - Only the dev can override by adding istanbul-ignore comments manually. You can recommend it but not do it!
   - Coverage report is generated in coverage/lcov.info
-- **Debugging**: VSCode debugger works perfectly with standard TypeScript - no runtime transformations
-  - Source maps enabled in tsconfig.json (`sourceMap: true`)
-  - Debug configurations include `smartStep` and `skipFiles` for better stepping
+- **Debugging**: VSCode debugger works with standard TypeScript - no runtime transformations
+  - If the server port is taken or you suspect any hung bun processes use `bun run kill` to kill all bun processes.
   - Full debugging support with accurate stepping and breakpoints
 
 ### Environment Configuration
@@ -89,7 +89,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `bun test src/app.test.ts` - Run specific test file. Combine with `/**` for whole folder.
 - `bun run test:watch` - Run tests in watch mode for TDD
-- **Note**: Tests in `src/util/` and `src/http/` are excluded from default batch runs due to Bun issue #5090. Run them individually if needed.
 - `bun run test` - Run linter, all tests and output coverage report with required threshold checked.
 - `bun run test:verbose` - Run tsc compilation, linter and unit tests.
 - `bun run test:integration` - Run integration tests only (ci/ folder)

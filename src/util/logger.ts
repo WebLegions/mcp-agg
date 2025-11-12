@@ -1,24 +1,12 @@
 // !!! DO NOT IMPORT env or ExtendedError !!!
 
 import cluster from 'node:cluster';
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { format, styleText } from 'node:util';
+import { name } from '../../package.json';
 import { isDebugging } from './debugger';
 import { replacerFn } from './immutable';
-
-// Read package.json name once at module load time
-let packageName: string | undefined;
-try {
-    const pkgPath = path.join(process.cwd(), 'package.json');
-    const pkgContent = readFileSync(pkgPath, 'utf8');
-    const pkg = JSON.parse(pkgContent);
-    packageName = pkg.name;
-} catch {
-    // Fallback if package.json cannot be read
-    packageName = undefined;
-}
 
 /**
  * Logger is a replacement for console logger:
@@ -84,7 +72,7 @@ export class LoggerConf {
         addTime = (process.env.LOG_ADD_TIME ?? 'false').toLowerCase() === 'true',
         formatter = (process.env.LOG_FORMAT ?? (isDebugging() ? 'line' : 'json')).toLowerCase() === 'json' ? jsonFn : lineFn,
         chalkFn = styleText,
-        app = process.env.APP_NAME ?? packageName ?? path.basename(process.execPath),
+        app = process.env.APP_NAME ?? name ?? path.basename(process.execPath),
     }: LoggerOptions = {}) {
         this.scope = scope;
         this.level = LoggerConf._normalizeLevel(level);
@@ -134,9 +122,6 @@ export interface Logger extends Readonly<Transport>, Readonly<Console> {
     level: LogLevel;
     scoped(name: string, level?: LogLevel): Logger;
 }
-
-// Re-export isDebuggerAttached from debugger module
-export { isDebugging as isDebuggerAttached };
 
 // Formatter for json output
 function jsonFn(this: LoggerConf, lvl: LogLevel, fn: LogFn, _chalk: Chalk, ...params: unknown[]) {

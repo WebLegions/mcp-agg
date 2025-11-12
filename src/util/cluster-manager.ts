@@ -12,6 +12,7 @@
 import cluster, { type Worker } from 'node:cluster';
 import type { PathLike } from 'node:fs';
 import os from 'node:os';
+import { isDebugging } from './debugger';
 import { Env } from './env';
 import { createLogger, type LogFn, type Logger, LogLevel } from './logger';
 
@@ -23,10 +24,10 @@ class ClusterManagerDefaults {
     readonly file: PathLike = '';
 
     /** Number of worker processes (1 if debugger attached, else from env/default CPU count, max 32) */
-    readonly workers: number = Env.isDebuggerAttached ? 1 : Env.get('CLUSTER_WORKERS', os.cpus().length, 1, 32);
+    readonly workers: number = isDebugging() ? 1 : Env.get('CLUSTER_WORKERS', os.cpus().length, 1, 32);
 
     /** Maximum restarts per window (0 if debugger attached, else from env/default 10) */
-    readonly maxRestarts: number = Env.isDebuggerAttached ? 0 : Env.get('CLUSTER_RESTART_MAX', 10, -1, 1000);
+    readonly maxRestarts: number = isDebugging() ? 0 : Env.get('CLUSTER_RESTART_MAX', 10, -1, 1000);
 
     /** Time window for restart tracking in ms */
     readonly restartWindow: number = Env.get('CLUSTER_RESTART_WINDOW', 60000, 1000, 3600000);

@@ -1,45 +1,47 @@
 #!/usr/bin/env bun
 /**
- * Check code coverage against minimum thresholds
- * Reads lcov.info and validates against 80% line coverage and 50% function coverage
- * Adds zero-coverage entries for files not in lcov report
+ * Check code coverage against minimum thresholds.
+ * - Reads lcov.info and validates against 80% line coverage and 50% function coverage.
+ * - Adds zero-coverage entries for files not in lcov report.
+ * - Removes files with * istanbul ignore file * comments from coverage.
+ * - Removes lines with * istanbul ignore next * comments from coverage calculations.
+ * - Generates a report showing coverage per file and folder.
  */
 
-import { appendFileSync, readFileSync } from 'node:fs';
-import { join, normalize, relative, sep } from 'node:path';
+import { readFileSync } from 'node:fs';
+import path, { join, normalize, sep } from 'node:path';
 import { glob } from 'glob';
-import { Env, ErrorEx, red, yellow } from '../src/util';
+import { Env, ErrorEx, green, grey, red, yellow } from '../src/util';
 
 // Configuration
 const TEST_LINE_THRESH = Env.get('TEST_LINE_THRESH', 80); // Line coverage threshold percentage
 const TEST_FUNC_THRESH = Env.get('TEST_FUNC_THRESH', 50); // Function coverage threshold percentage
-const FILE_WIDTH = 30; // File name column width
+const FILE_WIDTH = 35; // File name column width
 const PERCENT_WIDTH = 7; // Percentage column width
 const UNCOVERED_WIDTH = 30; // Uncovered line numbers column width
 
-// Coverage ignore patterns (from bunfig.toml)
-const TEST_COVERAGE_INCLUDE = JSON.parse(Env.get('TEST_COVERAGE_INCLUDE', `["src/**/*.{ts,js,tsx,jsx}"]`));
-const TEST_COVERAGE_IGNORE = JSON.parse(
-    Env.get(
-        'TEST_COVERAGE_IGNORE',
-        `[
-     "**/index.ts", "**/*.d.ts", "**/*types.ts",
-    "**/*.{test,spec}.*", "**/__mocks__/**",
-    "script/**",
-    "**/*cluster*.ts"
-    ]`,
-    ),
-);
+const TEST_COVERAGE_INCLUDE = Env.get('TEST_COVERAGE_INCLUDE', ['src/**/*.{ts,js,tsx,jsx}']);
+const TEST_COVERAGE_IGNORE = Env.get('TEST_COVERAGE_IGNORE', [
+    '**/index.ts',
+    '**/*.d.ts',
+    '**/*types.ts',
+    '**/*.{test,spec}.*',
+    '**/__mocks__/**',
+    'script/**',
+    '**/*cluster*.ts',
+]);
 
-interface Coverage {
-    file: string;
+interface FileCoverage {
+    name: string; // file name only used for sorting
+    path: string; // normalized full path
     lines: number;
     linesCov: number;
     funcs: number;
-    funcsCov: number;
     branches: number;
     branchesCov: number;
+    funcsCov: number;
     uncovered: number[];
+    ignored: boolean; // Has Istanbul ignore comment
 }
 
 interface FolderCoverage {
@@ -47,54 +49,71 @@ interface FolderCoverage {
     funcsCov: number;
     lines: number;
     linesCov: number;
-    uncovered: number[];
-    files: Array<{
-        name: string;
-        path: string; // relative path (stored but not displayed)
-        funcs: number;
-        funcsCov: number;
-        lines: number;
-        linesCov: number;
-        uncovered: number[];
-        ignored: boolean; // Has Istanbul ignore comment
-    }>;
+    files: Array<FileCoverage>;
 }
 
 // Console shortcuts
 const { log, error } = console;
 
 /** Normalize path to use forward slashes and lowercase for consistent comparison */
-function normalizePath(path: string): string {
-    return normalize(path)
+function normalizePath(pathStr: string, root = ''): string {
+    return normalize(pathStr)
         .replace(new RegExp(`\\${sep}`, 'g'), '/')
-        .toLowerCase();
+        .toLowerCase()
+        .replace(root, '');
 }
 
 /** Parse lcov.info file format */
-function parseLcov(lcovData: string): Coverage[] {
-    const files: Coverage[] = [];
+function parseLcov(lcovData: string): FileCoverage[] {
+    const cwd = process.cwd();
+    const files: FileCoverage[] = [];
     const lines = lcovData.split('\n');
-    let file: Partial<Coverage> = {};
-    const uncovered: number[] = [];
-    let daCount = 0; // Count actual DA lines
-    let daHitCount = 0; // Count DA lines with hits > 0
+    const empty: FileCoverage = {
+        name: '',
+        path: '',
+        uncovered: [],
+        funcs: 0,
+        lines: 0,
+        linesCov: 0,
+        branches: 0,
+        branchesCov: 0,
+        funcsCov: 0,
+        ignored: false,
+    } as const;
+    let file = empty;
+    let ignoredLines: Set<number> = new Set();
 
     for (const line of lines) {
         if (line.startsWith('SF:')) {
             // Start of new file
-            file = { file: line.substring(3), uncovered: [] };
-            daCount = 0;
-            daHitCount = 0;
+            file = { ...empty, uncovered: [] }; // Create new array for each file
+            file.path = normalizePath(line.substring(3));
+            file.name = path.basename(file.path);
+
+            // Load istanbul ignore comments for this file
+            const absolutePath = join(cwd, file.path);
+            ignoredLines = getIstanbulIgnoredLines(absolutePath);
+
+            // Check if whole file is ignored
+            if (ignoredLines.has(-1)) {
+                file.ignored = true;
+            }
         } else if (line.startsWith('DA:')) {
             // Data about a line: DA:line,hitCount
             const parts = line.substring(3).split(',');
             const lineNum = Number.parseInt(parts[0], 10);
             const hits = Number.parseInt(parts[1], 10);
-            daCount++; // Count this as an executable line
+
+            // Skip istanbul ignored lines entirely
+            if (file.ignored || ignoredLines.has(lineNum)) {
+                continue;
+            }
+
+            file.lines++; // Count this as an executable line
             if (hits === 0) {
-                uncovered.push(lineNum);
+                file.uncovered.push(lineNum);
             } else {
-                daHitCount++; // Count as covered
+                file.linesCov++; // Count as covered
             }
         } else if (line.startsWith('LF:')) {
             // Lines found - IGNORE buggy LF value, use DA count instead
@@ -103,36 +122,198 @@ function parseLcov(lcovData: string): Coverage[] {
             // Lines hit - IGNORE buggy LH value, use DA hit count instead
             // file.linesCov = Number.parseInt(line.substring(3), 10);
         } else if (line.startsWith('FNF:')) {
-            // Functions found
-            file.funcs = Number.parseInt(line.substring(4), 10);
-        } else if (line.startsWith('FNH:')) {
-            // Functions hit
-            file.funcsCov = Number.parseInt(line.substring(4), 10);
-        } else if (line.startsWith('BRF:')) {
-            // Branches found
-            file.branches = Number.parseInt(line.substring(4), 10);
-        } else if (line.startsWith('BRH:')) {
-            // Branches hit
-            file.branchesCov = Number.parseInt(line.substring(4), 10);
-        } else if (line === 'end_of_record') {
-            // End of current file
-            if (file.file) {
-                files.push({
-                    file: file.file,
-                    lines: daCount, // Use actual DA count instead of buggy LF
-                    linesCov: daHitCount, // Use actual hit count instead of buggy LH
-                    funcs: file.funcs ?? 0,
-                    funcsCov: file.funcsCov ?? 0,
-                    branches: file.branches ?? 0,
-                    branchesCov: file.branchesCov ?? 0,
-                    uncovered: [...uncovered],
-                });
+            // Functions found - skip if file is ignored
+            if (!file.ignored) {
+                file.funcs = Number.parseInt(line.substring(4), 10);
             }
-            uncovered.length = 0;
+        } else if (line.startsWith('FNH:')) {
+            // Functions hit - skip if file is ignored
+            if (!file.ignored) {
+                file.funcsCov = Number.parseInt(line.substring(4), 10);
+            }
+        } else if (line.startsWith('BRF:')) {
+            // Branches found - skip if file is ignored
+            if (!file.ignored) {
+                file.branches = Number.parseInt(line.substring(4), 10);
+            }
+        } else if (line.startsWith('BRH:')) {
+            // Branches hit - skip if file is ignored
+            if (!file.ignored) {
+                file.branchesCov = Number.parseInt(line.substring(4), 10);
+            }
+        } else if (line === 'end_of_record') {
+            // End of current file - only include files with actual lines (skip ignored files)
+            if (file.lines > 0) {
+                files.push(file);
+            }
         }
     }
 
     return files;
+}
+
+/**
+ * Find the next non-empty, non-comment line after the given index
+ * Returns 1-indexed line number, or -1 if not found
+ */
+function findNextExecutableLine(lines: string[], startIdx: number): number {
+    for (let i = startIdx + 1; i < lines.length; i++) {
+        const trimmed = lines[i].trim();
+        // Skip empty lines, single-line comments, and continuation of block comments
+        if (trimmed && !trimmed.startsWith('//') && !trimmed.startsWith('*') && trimmed !== '*/') {
+            return i + 1; // Return 1-indexed line number
+        }
+    }
+    return -1;
+}
+
+/**
+ * Find the end of a code block starting at the given line
+ * Returns 0-indexed line index of closing brace, or -1 if not a block
+ */
+function findBlockEnd(lines: string[], startIdx: number): number {
+    const line = lines[startIdx].trim();
+
+    // Check if line indicates a block start (has opening brace or arrow function)
+    // Common patterns: function foo() {, if (...) {, class Foo {, () => {, etc.
+    const hasOpenBrace = line.includes('{');
+    const isBlockStart = /\{|function\s|class\s|if\s*\(|for\s*\(|while\s*\(|do\s*\{|switch\s*\(|try\s*\{|=>\s*\{/.test(line);
+
+    if (!hasOpenBrace && !isBlockStart) {
+        return -1; // Not a block start
+    }
+
+    // Find matching closing brace
+    let braceCount = 0;
+    let foundOpen = false;
+
+    for (let i = startIdx; i < lines.length; i++) {
+        for (const char of lines[i]) {
+            if (char === '{') {
+                braceCount++;
+                foundOpen = true;
+            } else if (char === '}') {
+                braceCount--;
+                if (foundOpen && braceCount === 0) {
+                    return i; // Return 0-indexed line index
+                }
+            }
+        }
+    }
+
+    return -1; // No matching closing brace found
+}
+
+/**
+ * Parse istanbul ignore comments and return Set of line numbers to ignore
+ * Supports istanbul ignore next (ignores next statement/block)
+ * and istanbul ignore start/stop (ignores range)
+ */
+function getIstanbulIgnoredLines(filePath: string): Set<number> {
+    const ignoredLines = new Set<number>();
+
+    try {
+        const content = readFileSync(filePath, 'utf-8');
+        const lines = content.split('\n');
+
+        // Check first 10 lines for istanbul or c8 ignore comment.
+        // if found return all lines numbers of this file.
+        const firstLines = lines.slice(0, 10).join('\n');
+        if (/\/\*\s*(istanbul|c8)\s+ignore\s+file\b/.test(firstLines)) {
+            ignoredLines.add(-1);
+            return ignoredLines;
+        }
+
+        // search for other ignore comments
+        let inIgnoreBlock = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            const lineNum = i + 1; // 1-indexed for coverage reports
+            const line = lines[i];
+
+            // Check for ignore start/stop
+            if (/\/\*\s*(istanbul|c8)\s+ignore\s+start\b/.test(line)) {
+                inIgnoreBlock = true;
+                ignoredLines.add(lineNum); // Include the start comment line itself
+                continue;
+            }
+            if (/\/\*\s*(istanbul|c8)\s+ignore\s+(stop|end)\b/.test(line)) {
+                ignoredLines.add(lineNum); // Include the stop comment line itself
+                inIgnoreBlock = false;
+                continue;
+            }
+
+            // If in ignore block, mark this line
+            if (inIgnoreBlock) {
+                ignoredLines.add(lineNum);
+                continue;
+            }
+
+            // Check for ignore next
+            if (/\/\*\s*(istanbul|c8)\s+ignore\s+next\b/.test(line)) {
+                ignoredLines.add(lineNum); // Include the comment line itself
+
+                // Find next non-empty, non-comment line
+                const nextLineNum = findNextExecutableLine(lines, i);
+                if (nextLineNum !== -1) {
+                    const nextLineIdx = nextLineNum - 1; // Convert to 0-indexed
+
+                    // Check if it's a block start
+                    const blockEnd = findBlockEnd(lines, nextLineIdx);
+                    if (blockEnd !== -1) {
+                        // Mark entire block (from next line to closing brace, inclusive)
+                        for (let j = nextLineNum; j <= blockEnd + 1; j++) {
+                            ignoredLines.add(j);
+                        }
+                    } else {
+                        // Just mark the next line
+                        ignoredLines.add(nextLineNum);
+                    }
+                }
+            }
+        }
+    } catch {
+        // If file can't be read, return empty set
+    }
+
+    return ignoredLines;
+}
+
+/**
+ * Add entries for files not in lcov report.
+ * This ensures all source files appear in the coverage report
+ */
+function addMissingFilesToCoverage(coverageFiles: FileCoverage[]): FileCoverage[] {
+    const cwd = process.cwd();
+    const coveredFiles = new Set(coverageFiles.map((f) => normalizePath(join(cwd, f.path))));
+
+    const allSourceFiles = glob.sync(TEST_COVERAGE_INCLUDE, {
+        cwd,
+        absolute: true,
+        ignore: TEST_COVERAGE_IGNORE,
+    });
+
+    const missingFiles: FileCoverage[] = [];
+    for (const file of allSourceFiles) {
+        const normalizedPath = normalizePath(file);
+        if (coveredFiles.has(normalizedPath)) continue;
+        missingFiles.push({
+            name: path.basename(file),
+            path: normalizedPath,
+            lines: 1,
+            linesCov: 0,
+            funcs: 0,
+            funcsCov: 0,
+            branches: 0,
+            branchesCov: 0,
+            uncovered: [1],
+            ignored: false,
+        });
+    }
+    if (missingFiles.length > 0) {
+        log(`📝 Added ${missingFiles.length} files with zero coverage to coverageFiles`);
+    }
+    return [...coverageFiles, ...missingFiles];
 }
 
 /** Format file/folder name with proper padding and indentation */
@@ -146,88 +327,6 @@ function formatPercent(value: number, isFailing: boolean, isIgnored: boolean = f
     const formatted = value.toString().padStart(PERCENT_WIDTH);
     if (isIgnored) return yellow`${formatted}`;
     return isFailing ? red`${formatted}` : formatted;
-}
-
-/** Check if a file matches coverage ignore patterns */
-function shouldIgnoreFile(filePath: string): boolean {
-    const normalizedPath = filePath.replace(/\\/g, '/');
-    // Use glob's sync with ignore patterns to check if file would be ignored
-    // This is less efficient but avoids minimatch dependency
-    const matches = glob.sync([normalizedPath], { ignore: TEST_COVERAGE_IGNORE });
-    // If matches is empty, file is ignored
-    return matches.length === 0;
-}
-
-/** Check if a file has Istanbul ignore comment */
-function hasIstanbulIgnore(filePath: string): boolean {
-    try {
-        const content = readFileSync(filePath, 'utf-8');
-        // Check first few lines for istanbul ignore comment
-        const firstLines = content.split('\n').slice(0, 5).join('\n');
-        return /\/\*\s*istanbul\s+ignore\s+file\s*\*\//.test(firstLines);
-    } catch {
-        return false;
-    }
-}
-
-/**
- * Add entries for files not in lcov report.
- * This ensures all source files appear in the coverage report
- */
-function addMissingFilesToLcov(lcovPath: string): void {
-    // Read existing lcov data
-    const lcovData = readFileSync(lcovPath, 'utf-8');
-
-    // Get list of files already in lcov
-    const coveredFiles = new Set<string>();
-    const lines = lcovData.split('\n');
-    const cwd = process.cwd();
-    for (const line of lines) {
-        if (line.startsWith('SF:')) {
-            const relativePath = line.substring(3);
-            // Convert to absolute path before normalizing for consistent comparison
-            const absolutePath = join(cwd, relativePath);
-            const filePath = normalizePath(absolutePath);
-            coveredFiles.add(filePath);
-        }
-    }
-
-    // Find all TypeScript source files (using ignore patterns to exclude non-relevant files)
-    const allSourceFiles = glob.sync(TEST_COVERAGE_INCLUDE, {
-        cwd,
-        absolute: true,
-        ignore: TEST_COVERAGE_IGNORE,
-    });
-
-    // Find files missing from coverage
-    const missingFiles: string[] = [];
-    for (const file of allSourceFiles) {
-        const normalizedPath = normalizePath(file);
-
-        // Skip if already covered
-        if (coveredFiles.has(normalizedPath)) continue;
-
-        // Skip if has Istanbul ignore
-        if (hasIstanbulIgnore(file)) continue;
-
-        missingFiles.push(normalizedPath);
-    }
-
-    // Add zero-coverage entries for missing files
-    if (missingFiles.length > 0) {
-        let append = '';
-
-        for (const file of missingFiles) {
-            // Convert absolute path back to relative path (lcov uses relative paths)
-            const relativePath = relative(cwd, file);
-
-            // Add minimal lcov entry for zero coverage
-            append += `TN:\nSF:${relativePath}\nFNF:0\nFNH:0\nDA:1,0\nLF:1\nLH:0\nBRF:0\nBRH:0\nend_of_record\n`;
-        }
-
-        appendFileSync(lcovPath, append, 'utf-8');
-        log(`📝 Added ${missingFiles.length} files with zero coverage to lcov report`);
-    }
 }
 
 /** Format uncovered lines for display, using ranges for consecutive lines */
@@ -280,103 +379,74 @@ function formatUncovered(uncovered: number[]): string {
         }
     }
 
-    return formatted.padEnd(UNCOVERED_WIDTH);
+    return grey`${formatted.padEnd(UNCOVERED_WIDTH)}`;
 }
 
+//
+// main
+//
 try {
     const coveragePath = join(process.cwd(), 'coverage', 'lcov.info');
 
-    // Add missing files with zero coverage to lcov report
-    addMissingFilesToLcov(coveragePath);
-
     const lcovData = readFileSync(coveragePath, 'utf-8');
-    const coverageFiles = parseLcov(lcovData);
+    let coverageFiles = parseLcov(lcovData);
+    coverageFiles = addMissingFilesToCoverage(coverageFiles);
 
     // Calculate overall coverage
     let totalLines = 0;
     let coveredLines = 0;
     let totalFunctions = 0;
     let coveredFunctions = 0;
+    let uncoveredFiles = 0;
 
-    // Group files by folder
+    // Group files by folder and calculate folder coverage
     const folders = new Map<string, FolderCoverage>();
 
-    for (const fileCov of coverageFiles) {
+    for (const file of coverageFiles) {
         // Skip files that match ignore patterns
-        if (shouldIgnoreFile(fileCov.file)) {
+        const matches = glob.sync([file.path], { ignore: TEST_COVERAGE_IGNORE });
+        if (matches.length === 0) {
             continue;
         }
 
-        // Check if file has Istanbul ignore comment - skip entirely from report
-        const hasIgnore = hasIstanbulIgnore(fileCov.file);
-        if (hasIgnore) {
-            continue;
-        }
-
-        // Count towards overall coverage
-        totalLines += fileCov.lines;
-        coveredLines += fileCov.linesCov;
-        totalFunctions += fileCov.funcs;
-        coveredFunctions += fileCov.funcsCov;
-
-        // Normalize path and make it relative to cwd
-        const normalizedFile = normalizePath(fileCov.file);
-        const normalizedCwd = normalizePath(process.cwd());
-        let displayPath = normalizedFile.replace(normalizedCwd, '');
-        displayPath = displayPath.replace(/^\/+/, '');
-
-        // Extract folder and filename
-        const lastSlash = displayPath.lastIndexOf('/');
-        const folder = lastSlash > 0 ? displayPath.substring(0, lastSlash) : '.';
-        const filename = lastSlash > 0 ? displayPath.substring(lastSlash + 1) : displayPath;
-
-        if (!folders.has(folder)) {
-            folders.set(folder, {
+        const { dir } = path.parse(file.path);
+        if (!folders.has(dir)) {
+            folders.set(dir, {
                 funcs: 0,
                 funcsCov: 0,
                 lines: 0,
                 linesCov: 0,
-                uncovered: [],
                 files: [],
             });
         }
 
-        const folderData = folders.get(folder)!;
-        folderData.funcs += fileCov.funcs;
-        folderData.funcsCov += fileCov.funcsCov;
-        folderData.lines += fileCov.lines;
-        folderData.linesCov += fileCov.linesCov;
-        folderData.uncovered.push(...fileCov.uncovered);
+        const folderData = folders.get(dir)!;
+        folderData.funcs += file.funcs;
+        folderData.funcsCov += file.funcsCov;
+        folderData.lines += file.lines;
+        folderData.linesCov += file.linesCov;
 
-        folderData.files.push({
-            name: filename,
-            path: displayPath, // Store full path for clickable links
-            funcs: fileCov.funcs,
-            funcsCov: fileCov.funcsCov,
-            lines: fileCov.lines,
-            linesCov: fileCov.linesCov,
-            uncovered: fileCov.uncovered.sort((a, b) => a - b),
-            ignored: hasIgnore,
-        });
+        file.uncovered = file.uncovered.sort((a, b) => a - b);
+        folderData.files.push(file);
+
+        totalLines += file.lines;
+        coveredLines += file.linesCov;
+        totalFunctions += file.funcs;
+        coveredFunctions += file.funcsCov;
     }
 
-    const lineCoverage = (coveredLines / totalLines) * 100;
-    const functionCoverage = (coveredFunctions / totalFunctions) * 100;
-
-    // Build table data as object with keys (File column becomes the key)
-    const tableData: Record<string, Record<string, string>> = {};
+    // Build output table with formatting
+    const tableData: Record<string, string>[] = [];
 
     // Add "All files" summary first
-    const allFilesFuncs = Math.round(functionCoverage);
-    const allFilesLines = Math.round(lineCoverage);
-    const allFilesFuncsFail = allFilesFuncs < TEST_FUNC_THRESH;
-    const allFilesLinesFail = allFilesLines < TEST_LINE_THRESH;
-
-    tableData[indentPad('All files')] = {
-        funcs: formatPercent(allFilesFuncs, allFilesFuncsFail),
-        lines: formatPercent(allFilesLines, allFilesLinesFail),
+    const allFilesLines = Math.round((coveredLines / totalLines) * 100);
+    const allFilesFuncs = Math.round((coveredFunctions / totalFunctions) * 100);
+    tableData.push({
+        name: indentPad('All files'),
+        lines: formatPercent(allFilesLines, allFilesLines < TEST_LINE_THRESH),
+        funcs: formatPercent(allFilesFuncs, allFilesFuncs < TEST_FUNC_THRESH),
         uncov: formatUncovered([]),
-    };
+    });
 
     // Sort folders alphabetically
     const sortedFolders = Array.from(folders.entries()).sort(([a], [b]) => a.localeCompare(b));
@@ -389,17 +459,25 @@ try {
         const folderLinesFail = folderLinesPct < TEST_LINE_THRESH;
         const folderFail = folderLinesFail || folderFuncsFail;
 
-        const folderName = indentPad(folder, 1);
-        const funcsDisplay =
-            folderData.funcs > 0 ? formatPercent(folderFuncsPct, folderFuncsFail) : '    N/A'.padStart(PERCENT_WIDTH);
-        const linesDisplay =
-            folderData.lines > 0 ? formatPercent(folderLinesPct, folderLinesFail) : '    N/A'.padStart(PERCENT_WIDTH);
+        let folderName = indentPad(`${folder}/`, 1);
+        // Truncate folder name from the left until it fits FILE_WIDTH
+        if (folderName.length > FILE_WIDTH) {
+            const parts = folder.split('/');
+            while (folderName.length > FILE_WIDTH - 5 && parts.length > 1) {
+                parts.shift();
+                folderName = parts.join('/');
+            }
+            folderName = indentPad(`.../${folderName}/`, 1);
+        }
+        const funcsDisplay = folderData.funcs > 0 ? formatPercent(folderFuncsPct, folderFuncsFail) : '-'.padStart(PERCENT_WIDTH);
+        const linesDisplay = folderData.lines > 0 ? formatPercent(folderLinesPct, folderLinesFail) : '-'.padStart(PERCENT_WIDTH);
 
-        tableData[folderFail ? red`${folderName}` : folderName] = {
+        tableData.push({
+            name: folderFail ? red`${folderName}` : folderName,
             funcs: funcsDisplay,
             lines: linesDisplay,
-            uncov: formatUncovered(folderData.uncovered.sort((a, b) => a - b)),
-        };
+            uncov: formatUncovered([]),
+        });
 
         // Add files in this folder
         for (const file of folderData.files.sort((a, b) => a.name.localeCompare(b.name))) {
@@ -407,59 +485,47 @@ try {
             const fileLinesPct = file.lines > 0 ? Math.round((file.linesCov / file.lines) * 100) : 0;
             const fileFuncsFail = file.funcs > 0 && fileFuncsPct < TEST_FUNC_THRESH;
             const fileLinesFail = file.lines > 0 && fileLinesPct < TEST_LINE_THRESH;
-            // Files with Istanbul ignore don't fail the build
-            const fileFail = !file.ignored && (fileLinesFail || fileFuncsFail);
 
-            // Show filename only (not clickable, but clean display)
-            // Ignored files: white name, yellow percentages
-            // Failing files: red name and percentages
-            const indent = '   '; // 3 spaces for file indentation
-            const displayName = fileFail ? red`${file.name}` : file.name;
-            const clickableFile = indent + displayName;
+            // Use full normalized file path as key for clarity
+            let fileDisplay = `   ${file.name.substring(0, FILE_WIDTH - 3)}`;
+            fileDisplay = fileDisplay.padEnd(FILE_WIDTH);
 
             const funcsDisplay =
-                file.funcs > 0 ? formatPercent(fileFuncsPct, fileFuncsFail, file.ignored) : '    N/A'.padStart(PERCENT_WIDTH);
+                file.funcs > 0 ? formatPercent(fileFuncsPct, fileFuncsFail, file.ignored) : '    -'.padStart(PERCENT_WIDTH);
             const linesDisplay =
-                file.lines > 0 ? formatPercent(fileLinesPct, fileLinesFail, file.ignored) : '    N/A'.padStart(PERCENT_WIDTH);
+                file.lines > 0 ? formatPercent(fileLinesPct, fileLinesFail, file.ignored) : '    -'.padStart(PERCENT_WIDTH);
 
-            tableData[clickableFile] = {
+            tableData.push({
+                name: fileFuncsFail || fileLinesFail ? red`${fileDisplay}` : grey`${fileDisplay}`,
                 funcs: funcsDisplay,
                 lines: linesDisplay,
                 uncov: formatUncovered(file.uncovered),
-            };
+            });
+
+            uncoveredFiles += fileFuncsFail || fileLinesFail ? 1 : 0;
         }
     }
 
     // Print custom table (console.table escapes ANSI codes, so we build manually)
-    log('📊 Coverage Report:');
-    log('┌────────────────────────────────┬─────────┬─────────┬────────────────────────────────┐');
-    log('│ File                           │ % Lines │ % Funcs │ Uncovered Line #s              │');
-    log('├────────────────────────────────┼─────────┼─────────┼────────────────────────────────┤');
+    log('Coverage Report:');
+    log('┌─────────────────────────────────────┬─────────┬─────────┬────────────────────────────────┐');
+    log('│ File                                │ % Lines │ % Funcs │ Uncovered Line #s              │');
+    log('├─────────────────────────────────────┼─────────┼─────────┼────────────────────────────────┤');
 
-    for (const [filename, data] of Object.entries(tableData)) {
-        // Calculate visible length (excluding ANSI codes) for proper padding
-        // biome-ignore lint/suspicious/noControlCharactersInRegex: need to strip ANSI escape codes for length calculation
-        const visibleLength = filename.replace(/\x1b\[[0-9;]*m/g, '').length;
-        const paddedFilename = filename + ' '.repeat(Math.max(0, FILE_WIDTH - visibleLength));
-
-        log(`│ ${paddedFilename} │ ${data.lines} │ ${data.funcs} │ ${data.uncov} │`);
+    for (const row of tableData) {
+        log(`│ ${row.name} │ ${row.lines} │ ${row.funcs} │ ${row.uncov} │`);
     }
 
-    log('└────────────────────────────────┴─────────┴─────────┴────────────────────────────────┘');
+    log('└─────────────────────────────────────┴─────────┴─────────┴────────────────────────────────┘');
 
     // Check thresholds and exit
-    if (lineCoverage < TEST_LINE_THRESH || functionCoverage < TEST_FUNC_THRESH) {
-        if (lineCoverage < TEST_LINE_THRESH) {
-            error(red`❌ Line coverage ${Math.round(lineCoverage)} is below threshold ${TEST_LINE_THRESH}`);
-        }
-        if (functionCoverage < TEST_FUNC_THRESH) {
-            error(red`❌ Function coverage ${Math.round(functionCoverage)} is below threshold ${TEST_FUNC_THRESH}`);
-        }
+    if (uncoveredFiles) {
+        error(red`✗ ${uncoveredFiles} files are below coverage thresholds`);
         process.exit(1);
+    } else {
+        log(green`✓ All files meet thresholds`);
+        process.exit(0);
     }
-
-    log(`✅ Coverage meets thresholds: ${TEST_LINE_THRESH}% lines, ${TEST_FUNC_THRESH}% functions\n`);
-    process.exit(0);
 } catch (err) {
     error('Error reading coverage data:', new ErrorEx(err));
     error('Run "bun test" first to generate coverage data');

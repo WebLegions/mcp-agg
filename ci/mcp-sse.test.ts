@@ -6,6 +6,7 @@
 import { ok, strictEqual } from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { describe, test } from 'node:test';
+import { sleep } from '../src/util/sleep';
 
 /**
  * Wait for server to be ready by polling the health endpoint
@@ -20,7 +21,7 @@ async function waitForServer(port: number, maxAttempts = 30): Promise<void> {
         } catch {
             // Server not ready yet
         }
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await sleep(100);
     }
     throw new Error('Server failed to start');
 }

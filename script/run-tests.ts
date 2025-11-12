@@ -13,12 +13,6 @@ import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
-// Clean up coverage folder before running tests
-const coveragePath = join(process.cwd(), 'coverage');
-if (existsSync(coveragePath)) {
-    rmSync(coveragePath, { recursive: true, force: true });
-}
-
 // Parse command line arguments using node:util.parseArgs
 const { values, positionals } = parseArgs({
     args: process.argv.slice(2),
@@ -31,15 +25,16 @@ const { values, positionals } = parseArgs({
         port: {
             type: 'string',
             short: 'p',
-            default: '13582',
+            default: '5000',
         },
     },
     allowPositionals: true,
 });
 
 const hasSpecificFiles = positionals.length > 0;
+const filesToTest = positionals.length > 0 ? positionals : ['src'];
 let verbose = values.verbose || hasSpecificFiles;
-let output = '';
+let buffer = '';
 
 // Determine if a line should be shown in quiet mode
 const shouldShow = (line: string): boolean => {
@@ -74,11 +69,11 @@ const shouldShow = (line: string): boolean => {
 
 // Process output line by line
 const processOutput = (data: string, stream: NodeJS.WriteStream): void => {
-    output += data;
-    const lines = output.split('\n');
+    buffer += data;
+    const lines = buffer.split('\n');
 
     // Keep the last incomplete line in the buffer
-    output = lines.pop() || '';
+    buffer = lines.pop() || '';
 
     for (const line of lines) {
         if (shouldShow(line)) {
@@ -90,54 +85,63 @@ const processOutput = (data: string, stream: NodeJS.WriteStream): void => {
 
 // Flush remaining buffer
 const flushBuffer = (stream: NodeJS.WriteStream): void => {
-    if (shouldShow(output)) {
-        stream.write(`${output}\x1b[0m\n`);
+    if (shouldShow(buffer)) {
+        stream.write(`${buffer}\x1b[0m\n`);
     }
 };
 
-// Build test arguments
-const testArgs = ['--coverage', '--coverage-reporter=lcov', ...(positionals.length > 0 ? positionals : ['src'])];
-
-// Run bun test
+// Run tests
 async function runTests(): Promise<number> {
-    return new Promise((resolve) => {
-        const cmd = `bun test ${testArgs.join(' ')}`;
-        if (!verbose) {
-            console.log(`\x1b[2m${cmd}\x1b[0m\n`);
-        } else {
-            console.log(cmd);
-        }
+    // Clean up coverage folder
+    const coveragePath = join(process.cwd(), 'coverage');
+    if (existsSync(coveragePath)) {
+        rmSync(coveragePath, { recursive: true, force: true });
+    }
 
-        const proc = spawn('bun', ['test', ...testArgs], {
-            stdio: ['inherit', 'pipe', 'pipe'],
-            shell: true,
-            env: { ...process.env, LOG_FORMAT: 'line', PORT: values.port },
-        });
+    const { promise, resolve, reject } = Promise.withResolvers<number>();
+    const args = ['--coverage', '--coverage-reporter=lcov', ...filesToTest];
+    const cmd = `bun test ${args.join(' ')}`;
+    if (!verbose) {
+        console.log(`\x1b[2m${cmd}\x1b[0m\n`);
+    } else {
+        console.log(cmd);
+    }
 
-        // Process stdout
-        proc.stdout?.on('data', (data) => {
-            processOutput(data.toString(), process.stdout);
-        });
-
-        // Process stderr (errors go here)
-        proc.stderr?.on('data', (data) => {
-            processOutput(data.toString(), process.stderr);
-        });
-
-        proc.on('close', (code) => {
-            flushBuffer(process.stdout);
-            flushBuffer(process.stderr);
-            resolve(code || 0);
-        });
-
-        proc.on('error', (err) => {
-            console.error('\x1b[31mFailed to start test runner:\x1b[0m', err);
-            resolve(1);
-        });
+    const proc = spawn('bun', ['test', ...args], {
+        stdio: ['inherit', 'pipe', 'pipe'],
+        shell: true,
+        env: { ...process.env, LOG_FORMAT: 'line', PORT: values.port, NODE_TEST_CONTEXT: 'true', AT_TERMINATE_TIMEOUT: '10000' },
     });
+
+    // Process stdout
+    proc.stdout?.on('data', (data) => {
+        processOutput(data.toString(), process.stdout);
+    });
+
+    // Process stderr (errors go here)
+    proc.stderr?.on('data', (data) => {
+        processOutput(data.toString(), process.stderr);
+    });
+
+    proc.on('close', (code) => {
+        flushBuffer(process.stdout);
+        flushBuffer(process.stderr);
+        resolve(code || 0);
+    });
+
+    proc.on('error', (err) => {
+        console.error('\x1b[31mFailed to start test runner:\x1b[0m', err);
+        reject(err);
+    });
+
+    return promise;
 }
 
 // Run tests and exit with the same code
-runTests().then((code) => {
-    process.exit(code);
-});
+runTests()
+    .then((code) => {
+        process.exit(code);
+    })
+    .catch((_err) => {
+        process.exit(1);
+    });

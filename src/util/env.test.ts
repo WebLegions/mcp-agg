@@ -48,6 +48,32 @@ describe('env', (t) => {
         }
     });
 
+    test('get Env var with object default and JSON parsing', () => {
+        const save = { ...process.env };
+        try {
+            // Valid JSON
+            process.env.TEST_OBJ = '{"foo":42,"bar":"baz"}';
+            const defObj = { foo: 0, bar: '' };
+            const result = Env.get('TEST_OBJ', defObj);
+            equal(result.foo, 42);
+            equal(result.bar, 'baz');
+
+            // Invalid JSON falls back to default
+            process.env.TEST_OBJ = 'not-json';
+            const result2 = Env.get('TEST_OBJ', defObj);
+            equal(result2.foo, 0);
+            equal(result2.bar, '');
+
+            // No env var returns default
+            delete process.env.TEST_OBJ;
+            const result3 = Env.get('TEST_OBJ', defObj);
+            equal(result3.foo, 0);
+            equal(result3.bar, '');
+        } finally {
+            Object.assign(process.env, save);
+        }
+    });
+
     test('print info even if logger elevated', (t) => {
         const fn = mock.fn();
         const log = createLogger(t.name, LogLevel.EMERGENCY, { log: fn, error: fn });
@@ -97,7 +123,8 @@ describe('env', (t) => {
     });
 
     test('hasDOM detection', () => {
-        equal(Env.hasDOM, false);
+        // With happy-dom preloaded for tests, DOM is available
+        equal(Env.hasDOM, true);
     });
 
     test('runtime detection', () => {

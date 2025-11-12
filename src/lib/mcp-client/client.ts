@@ -37,7 +37,7 @@ export const validators = {
         return _validators.result;
     },
     async init() {
-        await initValidators();
+        return initValidators();
     },
 } as const;
 

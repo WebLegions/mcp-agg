@@ -6,27 +6,15 @@
     <title>Fastify Bun Starter</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/digitallytailored/classless@latest/classless.min.css">
-    <style>
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            padding: 8px;
-            line-height: 1;
-            opacity: 0.7;
-            transition: opacity 0.2s;
-        }
-        .theme-toggle:hover {
-            opacity: 1;
-        }
-    </style>
+    <script>
+        // Initialize theme
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const savedTheme = localStorage.getItem('theme');
+        const initialTheme = savedTheme ? savedTheme === 'dark' : prefersDark;
+        document.documentElement.setAttribute('color-scheme', initialTheme ? 'dark' : 'light');
+    </script>
 </head>
 <body>
-    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">🌙</button>
     <main>
         <header>
             <h1>Welcome! 👋</h1>
@@ -63,23 +51,8 @@
             <p>Powered by Fastify + Bun</p>
         </footer>
     </main>
-    <script>
-        // Theme toggle functionality (inline to avoid CSP issues)
-        const toggle = document.getElementById('themeToggle');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const savedTheme = localStorage.getItem('theme');
-        const isDark = savedTheme ? savedTheme === 'dark' : prefersDark;
 
-        if (isDark) {
-            document.documentElement.classList.add('dark');
-            toggle.textContent = '☀️';
-        }
-
-        toggle.addEventListener('click', () => {
-            const isDark = document.documentElement.classList.toggle('dark');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            toggle.textContent = isDark ? '☀️' : '🌙';
-        });
-    </script>
+    <theme-toggle></theme-toggle>
+    <script type="module" src="/public/components/index.ts"></script>
 </body>
 </html>

@@ -1,10 +1,11 @@
-/* istanbul ignore file */
 //
 // this lib implements the best practices for handling termination on nodejs
 // see https://blog.heroku.com/best-practices-nodejs-errors
 // app can register callbacks to be called on process graceful termination.
 // the lib also registers unhandled-exception handlers on first call to atExit()
 //
+
+import { Env } from './env';
 
 export type AtExit = (sig?: NodeJS.Signals) => void | Promise<void>;
 const cbs: AtExit[] = [];
@@ -14,12 +15,13 @@ function makeExitHandler(code: number, sig: NodeJS.Signals) {
     return async () => {
         console.warn(`Exiting on ${sig}...`);
 
-        // Explicitly use the value getter to ensure we get a number
+        const timeout = Env.get('AT_TERMINATE_TIMEOUT', 1000);
+
         const to = setTimeout(() => {
             clearTimeout(to);
             console.warn(`Exiting on ${sig} timeout. Killing process.`);
             process.exit(code);
-        }, Number(process.env.AT_TERMINATE_TIMEOUT) || 1000).unref();
+        }, timeout).unref();
 
         const waitings: Promise<void>[] = [];
         let cb: AtExit | undefined;

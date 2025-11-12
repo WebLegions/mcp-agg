@@ -6,6 +6,7 @@
 import { ok, strictEqual } from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { describe, test } from 'node:test';
+import { sleep } from '../src/util/sleep';
 
 /**
  * Send a request to stdio process and wait for response
@@ -65,7 +66,7 @@ describe('MCP stdio transport (CI)', () => {
 
         try {
             // Wait for server to initialize
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await sleep(500);
 
             // Send tools/list request
             const response = await sendStdioRequest(mcpProcess, {
@@ -103,7 +104,7 @@ describe('MCP stdio transport (CI)', () => {
         });
 
         try {
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await sleep(500);
 
             const response = await sendStdioRequest(mcpProcess, {
                 jsonrpc: '2.0',
@@ -142,7 +143,7 @@ describe('MCP stdio transport (CI)', () => {
         });
 
         try {
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await sleep(500);
 
             const response = await sendStdioRequest(mcpProcess, {
                 jsonrpc: '2.0',
@@ -186,7 +187,7 @@ describe('MCP stdio transport (CI)', () => {
         });
 
         try {
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await sleep(500);
 
             // First request
             const response1 = await sendStdioRequest(mcpProcess, {
