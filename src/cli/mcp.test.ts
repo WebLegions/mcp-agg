@@ -69,7 +69,7 @@ describe('mcp-cli', () => {
     test('runMCPCLI shows help with no args', async () => {
         const exitCode = await runMCPCLI([]);
 
-        assert.equal(exitCode, 1);
+        assert.equal(exitCode, 0);
         assert.ok(logs.some((log) => log.includes('Usage:')));
         assert.ok(logs.some((log) => log.includes('Commands:')));
     });
@@ -77,14 +77,14 @@ describe('mcp-cli', () => {
     test('runMCPCLI shows help with --help flag', async () => {
         const exitCode = await runMCPCLI(['--help']);
 
-        assert.equal(exitCode, 1);
+        assert.equal(exitCode, 0);
         assert.ok(logs.some((log) => log.includes('Usage:')));
     });
 
     test('runMCPCLI shows help with -h flag', async () => {
         const exitCode = await runMCPCLI(['-h']);
 
-        assert.equal(exitCode, 1);
+        assert.equal(exitCode, 0);
         assert.ok(logs.some((log) => log.includes('Usage:')));
     });
 

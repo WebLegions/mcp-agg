@@ -1,6 +1,14 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "lib": ["es2022", "dom"]
-  }
+    "lib": ["es2022", "dom"],
+    "allowJs": true,
+    "checkJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@types": ["./types/index.d.ts"],
+      "@types/*": ["./types/*"]
+    }
+  },
+  "include": ["**/*.{js,ts}", "**/*.d.ts"]
 }

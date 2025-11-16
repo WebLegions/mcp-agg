@@ -1,6 +1,6 @@
 import fastifySwagger from '@fastify/swagger';
 import type { FastifyInstance, FastifySchema } from 'fastify';
-import { Env } from '../util';
+import { Env } from '../utils';
 
 /**
  * Transform function to convert our Zod-like validator schemas to JSON Schema

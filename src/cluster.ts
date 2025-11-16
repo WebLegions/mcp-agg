@@ -2,8 +2,8 @@
 /* istanbul ignore file */
 
 import cluster from 'node:cluster';
-import { ClusterManager } from './util';
-import { env } from './util/env';
+import { ClusterManager } from './libs/cluster';
+import { Env } from './shared/utils/env';
 
 // Global cluster manager instance
 let clusterManager: ClusterManager | undefined;
@@ -39,7 +39,7 @@ async function startWorker() {
  * Start cluster mode - only runs when this file is executed directly
  */
 async function startCluster() {
-    env.print();
+    Env.print();
 
     // If this is a worker process, just start the server
     if (cluster.isWorker) {

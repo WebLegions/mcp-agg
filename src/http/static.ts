@@ -7,13 +7,13 @@ import type { FastifyInstance } from 'fastify';
  * Register static file serving plugin
  * Serves files from src/public directory using streaming
  */
-export async function registerStatic(app: FastifyInstance) {
+export async function registerStatic(app: FastifyInstance, localPath = '../public', urlPrefix = '/') {
     const currentDir = dirname(fileURLToPath(import.meta.url));
-    const publicPath = join(currentDir, '..', 'public');
+    const publicPath = join(currentDir, localPath);
 
     await app.register(fastifyStatic, {
         root: publicPath,
-        prefix: '/',
+        prefix: urlPrefix,
         index: ['index.html'],
     });
 

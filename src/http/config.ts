@@ -4,14 +4,14 @@
  */
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { getManager } from '../controller/mcp-controller/config';
-import { registerMCPServerTools } from '../controller/mcp-controller/register';
-import type { MCPServerConfig } from '../controller/mcp-controller/types';
-import { mcpServerConfigSchema } from '../controller/mcp-controller/types';
-import { MCPServer } from '../lib/mcp-server';
-import { z } from '../lib/validator';
-import { Env } from '../util';
-import type { WithBody, WithParams, WithParamsAndBody, WithQuerystring } from './route-types';
+import { getManager } from '../controllers/mcp-controller/config';
+import { registerMCPServerTools } from '../controllers/mcp-controller/register';
+import { MCPServer } from '../libs/mcp-server';
+import { z } from '../shared/libs/validator';
+import type { MCPServerConfig } from '../shared/types/mcp-config';
+import { mcpServerConfigSchema } from '../shared/types/mcp-config';
+import { Env } from '../utils';
+import type { RouteSchema, WithBody, WithParams, WithParamsAndBody, WithQuerystring } from './route-types';
 
 /**
  * Common response schemas
@@ -65,7 +65,7 @@ const toolsResponse = z
 /**
  * Request schemas for MCP configuration endpoints
  */
-const listServersSchema = {
+const listServersSchema: RouteSchema = {
     description: 'List all MCP server configurations',
     tags: ['MCP Configuration'],
     summary: 'Get all MCP servers',
@@ -75,7 +75,7 @@ const listServersSchema = {
     },
 };
 
-const getServerSchema = {
+const getServerSchema: RouteSchema = {
     description: 'Get a specific MCP server configuration by name',
     tags: ['MCP Configuration'],
     summary: 'Get MCP server by name',
@@ -88,7 +88,7 @@ const getServerSchema = {
     },
 };
 
-const createServerSchema = {
+const createServerSchema: RouteSchema = {
     description: 'Create a new MCP server configuration',
     tags: ['MCP Configuration'],
     summary: 'Create MCP server',
@@ -100,7 +100,7 @@ const createServerSchema = {
     },
 };
 
-const updateServerSchema = {
+const updateServerSchema: RouteSchema = {
     description: 'Update an existing MCP server configuration',
     tags: ['MCP Configuration'],
     summary: 'Update MCP server',
@@ -123,7 +123,7 @@ const updateServerSchema = {
     },
 };
 
-const deleteServerSchema = {
+const deleteServerSchema: RouteSchema = {
     description: 'Delete an MCP server configuration',
     tags: ['MCP Configuration'],
     summary: 'Delete MCP server',
@@ -136,7 +136,7 @@ const deleteServerSchema = {
     },
 };
 
-const enableServerSchema = {
+const enableServerSchema: RouteSchema = {
     description: 'Enable or disable an MCP server',
     tags: ['MCP Configuration'],
     summary: 'Enable/disable MCP server',
@@ -152,7 +152,7 @@ const enableServerSchema = {
     },
 };
 
-const listToolsSchema = {
+const listToolsSchema: RouteSchema = {
     description: 'List all available MCP tools from all servers (or filtered by server name)',
     tags: ['MCP Configuration'],
     summary: 'List MCP tools',
@@ -164,11 +164,6 @@ const listToolsSchema = {
         404: errorResponse.describe('Server not found'),
     },
 };
-
-/**
- * Fastify schema validation handles all request validation
- * No need for additional manual validators
- */
 
 /**
  * Register MCP configuration management routes

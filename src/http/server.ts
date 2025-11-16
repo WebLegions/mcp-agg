@@ -1,10 +1,9 @@
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { getSystemErrorName } from 'node:util';
 import Fastify from 'fastify';
-import { type Provider, schemaCompiler } from '../lib/validator';
-import { Env } from '../util/env';
-import { replacerFn, reviverFn } from '../util/immutable';
-import { fromHumanBytes } from '../util/text';
+import { Env } from '../shared/utils/env';
+import { fromHumanBytes } from '../shared/utils/text';
+import { replacerFn, reviverFn } from '../utils/immutable';
 import { registerConfig } from './config';
 import { registerHealth } from './health';
 import { registerHello } from './hello';
@@ -13,6 +12,62 @@ import { registerSecurityPlugins } from './security';
 import { registerStatic } from './static';
 import { registerSwagger } from './swagger';
 import { registerTranspile } from './transpile';
+import { type Provider, schemaCompiler, serializerCompiler } from './type-provider';
+
+/**
+ * Get user-friendly error message from any error type
+ * Handles system errors (NodeJS.ErrnoException) with special formatting
+ */
+/* istanbul ignore next **/
+function getErrorMessage(err: unknown, port?: number): string {
+    // Handle NodeJS system errors with error codes
+    if (err && typeof err === 'object' && 'code' in err) {
+        const sysErr = err as NodeJS.ErrnoException;
+        const code = sysErr.code;
+
+        if (!code) {
+            return sysErr.message || String(err);
+        }
+
+        // Get the system error name (e.g., EADDRINUSE)
+        // Note: getSystemErrorName requires negative errno, use code as fallback
+        let errorName = code;
+        if (sysErr.errno && sysErr.errno < 0) {
+            try {
+                errorName = getSystemErrorName(sysErr.errno) || code;
+            } catch {
+                // Fallback to code if getSystemErrorName fails
+                errorName = code;
+            }
+        }
+
+        // Special case for EADDRINUSE
+        if (code === 'EADDRINUSE') {
+            return `Port ${port ?? 'unknown'} is already in use. Is another server already running?`;
+        }
+
+        // Map common error codes to user-friendly messages
+        const errorMessages: Record<string, string> = {
+            EACCES: `Permission denied. Port ${port ?? 'unknown'} requires elevated privileges (try sudo or use port > 1024)`,
+            EADDRNOTAVAIL: 'Address not available. Check if the host address is valid',
+            ECONNREFUSED: 'Connection refused. The server is not accepting connections',
+            ECONNRESET: 'Connection reset by peer',
+            ETIMEDOUT: 'Connection timed out',
+            ENOTFOUND: 'Host not found. Check your network connection',
+            ENOENT: 'File or directory not found',
+        };
+
+        return errorMessages[code] || `${errorName}: ${sysErr.message}`;
+    }
+
+    // Handle standard Error objects
+    if (err instanceof Error) {
+        return err.message;
+    }
+
+    // Fallback for unknown error types
+    return String(err);
+}
 
 /**
  * Create and configure Fastify server instance
@@ -26,7 +81,8 @@ export function createServer() {
         },
     })
         .withTypeProvider<Provider>()
-        .setValidatorCompiler(schemaCompiler);
+        .setValidatorCompiler(schemaCompiler)
+        .setSerializerCompiler(serializerCompiler);
 
     // Use JSON.parse with custom reviver for BigInt support and __ property filtering
     // This replaces Fastify's default secure-json-parse with the much faster Bun.parse.
@@ -38,12 +94,6 @@ export function createServer() {
         } catch (err) {
             done(err instanceof Error ? err : new Error(String(err)), undefined);
         }
-    });
-
-    // Use JSON.stringify with custom replacer for BigInt serialization
-    // This replaces Fastify's default fast-json-stringify
-    app.setSerializerCompiler(() => {
-        return (data) => JSON.stringify(data, replacerFn, 0);
     });
 
     // Set default reply serializer to handle BigInt globally (for routes without schemas)
@@ -70,16 +120,21 @@ export async function registerRoutes(app: ReturnType<typeof createServer>) {
     registerMCP(app);
     registerConfig(app); // MCP server configuration CRUD API
 
-    // Register transpile routes (before static to handle frontend paths)
-    const currentDir = dirname(fileURLToPath(import.meta.url));
-    const frontendDir = join(currentDir, '..', 'frontend');
+    // Register transpile routes for frontend app.
+    const frontend = join(__dirname, '..', 'frontend');
+    const shared = join(__dirname, '..', 'shared');
 
-    registerTranspile(app, join(frontendDir, 'components'), '/public/components');
-    registerTranspile(app, join(frontendDir, 'util'), '/public/util');
-    registerTranspile(app, join(frontendDir, 'app'), '/public/app');
+    registerTranspile(app, join(frontend, 'components'), '/public/components');
+    registerTranspile(app, join(frontend, 'util'), '/public/util');
+    registerTranspile(app, join(frontend, 'app'), '/public/app');
+    registerTranspile(app, join(frontend, 'views'), '/public/views');
+    registerTranspile(app, join(frontend, 'types'), '/public/types');
+
+    // Register shared folder (accessible to both frontend and backend)
+    registerTranspile(app, shared, '/shared');
 
     // Register static file serving (must be last to avoid route conflicts)
-    await registerStatic(app);
+    await registerStatic(app, '../public', '/');
 }
 
 /**
@@ -95,7 +150,10 @@ export async function startServer(app: ReturnType<typeof createServer>) {
         console.log(`Health check: http://${host}:${port}/health`);
         console.log(`Swagger UI: http://${host}:${port}/api/v1/swagger`);
     } catch (err) {
-        console.error('Error starting server:', err);
+        // Get user-friendly error message
+        const errorMessage = getErrorMessage(err, port);
+        console.error(`Error starting server: ${errorMessage}`);
+
         // In test mode (NODE_TEST_CONTEXT set), throw error instead of exiting
         if (process.env.NODE_TEST_CONTEXT) {
             throw err;

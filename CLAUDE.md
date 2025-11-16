@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Once you have some new functionality working well and you write a summary of the tasks status, you should git-stage the code to prevent it from getting lost. You should ask for the developer explicit permission if you want to revert to staged or revert to latest commit.
 - Suggest the user to commit the code after a set of functionality is passing.
 - If you're iterating on a task for over a minute, ask the user if you should continue working on the task.
+- **IMPORTANT**: Always specify explicit timeout values for Bash commands. Never let commands run longer than 30 seconds (30000ms) unless absolutely necessary. This prevents infinite loops and hanging processes.
 
 ### Coding patterns
 
@@ -36,6 +37,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Before completing a task, the code needs to be "clean" from errors (use `bun run test:verbose` to make sure all code and tests are passing.)
 - No circular dependencies in code and no late importing. Use patterns like callbacks and event-emitters when needed.
 - All imports should be at the top of the file, ordered alphabetically (import path, import name).
+- Never use syncronous APIs like `statSync` or `readFileSync`. Always use their respective async APIs instead!
 
 ### Cyber security considerations
 
@@ -46,7 +48,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Fastify Framework
 
-- Uses Fastify as the HTTP framework
+- The project uses Fastify as the HTTP framework
 - Use the Validator library from src\lib for runtime type validation and schema definitions
 - CLI support using Node.js built-in `node:util.parseArgs`
 - Plain console logging (no external logging library)
@@ -81,7 +83,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Development and tests**: Both use `.env.development` (NODE_ENV=development)
 - **Production**: Environment variables set directly in Dockerfile (`NODE_ENV=production`)
 - **Environment loading**: Attempts to load `.env.{NODE_ENV}`, falls back to defaults if file doesn't exist
-- **Release**: In non-local environment, including QA, staging and production, the code is run in a docker image. Use `bun run build` to build the image. This also runs the unit tests as first stage and a vulnerability scan as last stage. Failing test fail the build.
+- **Release**: In non-local environments, including QA, Staging and Production, the code is run in a docker image. Use `bun run build` to build the image. This also runs the unit tests as first stage and a vulnerability scan as last stage. Failing test and high/critical volnrabilities fail the build.
 
 ## Commands
 

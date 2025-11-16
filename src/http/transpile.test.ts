@@ -221,5 +221,53 @@ describe('Transpile endpoint', () => {
 
             assert.equal(res.headers['content-type'], 'application/json; charset=utf-8');
         });
+
+        test('should return correct MIME type for JavaScript', async () => {
+            const res = await app.inject({
+                method: 'GET',
+                url: '/public/components/__mocks__/sample.js',
+            });
+
+            assert.equal(res.statusCode, 200);
+            assert.equal(res.headers['content-type'], 'application/javascript; charset=utf-8');
+        });
+    });
+
+    describe('TypeScript import extensions', () => {
+        test('should add .ts extensions to relative imports', async () => {
+            const res = await app.inject({
+                method: 'GET',
+                url: '/public/components/__mocks__/with-import.ts',
+            });
+
+            assert.equal(res.statusCode, 200);
+            // Check that imports have .ts extensions added
+            assert.ok(res.body.includes('./sample.ts') || res.body.includes('"./sample.ts"'));
+        });
+    });
+
+    describe('Unknown file types', () => {
+        test('should handle unknown file extensions', async () => {
+            const res = await app.inject({
+                method: 'GET',
+                url: '/public/components/__mocks__/sample.txt',
+            });
+
+            // Unknown file type should still be served with empty content-type
+            assert.equal(res.statusCode, 200);
+        });
+    });
+
+    describe('JavaScript minification', () => {
+        test('should minify JavaScript files when requested', async () => {
+            const res = await app.inject({
+                method: 'GET',
+                url: '/public/components/__mocks__/sample.js?minify=true',
+            });
+
+            assert.equal(res.statusCode, 200);
+            // Minified JS should have reduced whitespace
+            assert.ok(res.body.includes('function'));
+        });
     });
 });

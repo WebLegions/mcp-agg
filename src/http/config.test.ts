@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, test } from 'node:test';
-import { getManager } from '../controller/mcp-controller/config';
+import { getManager } from '../controllers/mcp-controller/config';
 import { createServer, registerRoutes } from './server';
 
 describe('MCP Configuration REST API', () => {
@@ -390,10 +390,10 @@ describe('MCP Configuration REST API', () => {
         assert.ok(body.total >= 2);
         assert.ok(body.summary.builtinTools >= 2);
 
-        // Check for built-in tools
+        // Check for built-in tools (no prefix for builtin tools)
         const toolNames = body.tools.map((t: { name: string }) => t.name);
-        assert.ok(toolNames.includes('builtin:health'));
-        assert.ok(toolNames.includes('builtin:format_number'));
+        assert.ok(toolNames.includes('health'));
+        assert.ok(toolNames.includes('format_number'));
 
         // Verify each tool has required fields
         for (const tool of body.tools) {

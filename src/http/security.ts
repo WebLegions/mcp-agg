@@ -2,7 +2,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import type { FastifyInstance } from 'fastify';
-import { Env } from '../util/env';
+import { Env } from '../shared/utils/env';
 
 /**
  * Register Helmet security headers plugin

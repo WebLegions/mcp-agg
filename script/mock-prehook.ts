@@ -4,7 +4,7 @@
 
 // NOTE: Testing with node:test on Bun is broken in newer Bun versions.
 // See: https://github.com/oven-sh/bun/issues/5030
-import { Version } from '../src/util/version';
+import { Version } from '../src/shared/utils/version';
 
 if (typeof Bun !== 'undefined' && Bun.version) {
     const bunVer = new Version(Bun.version);

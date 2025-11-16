@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { type Infer, z } from '../lib/validator';
-import type { WithBody, WithQuerystring } from './route-types';
+import { type Infer, z } from '../shared/libs/validator';
+import { RouteSchema, type WithBody, type WithQuerystring } from './route-types';
 
 /**
  * IETF BCP 47 locale pattern
@@ -136,17 +136,27 @@ export function registerHello(app: FastifyInstance) {
         }),
     };
 
+    const getSchema: RouteSchema = {
+        summary: 'Format a number according to locale',
+        description: 'Formats a number using Intl.NumberFormat with the specified locale',
+        tags: ['API Example'],
+        querystring: numberFormatSchema,
+        response: responseSchema,
+    };
+
+    const postSchema: RouteSchema = {
+        summary: 'Format a number according to locale',
+        description: 'Formats a number using Intl.NumberFormat with the specified locale',
+        tags: ['API Example'],
+        body: numberFormatSchema,
+        response: responseSchema,
+    };
+
     // GET endpoint with query parameters
     app.get<WithQuerystring<NumberFormatRequest>>(
         '/api/v1/hello',
         {
-            schema: {
-                summary: 'Format a number according to locale',
-                description: 'Formats a number using Intl.NumberFormat with the specified locale',
-                tags: ['API Example'],
-                querystring: numberFormatSchema,
-                response: responseSchema,
-            },
+            schema: getSchema,
         },
         async (request: FastifyRequest<WithQuerystring<NumberFormatRequest>>, reply: FastifyReply) => {
             const { number, locale } = request.query;
@@ -158,13 +168,7 @@ export function registerHello(app: FastifyInstance) {
     app.post<WithBody<NumberFormatRequest>>(
         '/api/v1/hello',
         {
-            schema: {
-                summary: 'Format a number according to locale (JSON body)',
-                description: 'Formats a number using Intl.NumberFormat with the specified locale',
-                tags: ['API Example'],
-                body: numberFormatSchema,
-                response: responseSchema,
-            },
+            schema: postSchema,
         },
         async (request: FastifyRequest<WithBody<NumberFormatRequest>>, reply: FastifyReply) => {
             const { number, locale } = request.body;

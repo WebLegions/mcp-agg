@@ -1,5 +1,5 @@
 import { createServer, registerRoutes, startServer } from './http/server';
-import { hookConsole, logger } from './util';
+import { hookConsole, logger } from './utils';
 
 // Initialize environment and hook console with the global logger
 hookConsole(logger);

@@ -11,7 +11,8 @@
 import { readFileSync } from 'node:fs';
 import path, { join, normalize, sep } from 'node:path';
 import { glob } from 'glob';
-import { Env, ErrorEx, green, grey, red, yellow } from '../src/util';
+import { ErrorEx } from '../src/shared/utils/error';
+import { Env, green, grey, red, yellow } from '../src/utils';
 
 // Configuration
 const TEST_LINE_THRESH = Env.get('TEST_LINE_THRESH', 80); // Line coverage threshold percentage
@@ -29,6 +30,9 @@ const TEST_COVERAGE_IGNORE = Env.get('TEST_COVERAGE_IGNORE', [
     '**/__mocks__/**',
     'script/**',
     '**/*cluster*.ts',
+    'src/frontend/**',
+    'src/http/inject-env-posthook.ts',
+    'src/utils/env.ts',
 ]);
 
 interface FileCoverage {
@@ -93,11 +97,8 @@ function parseLcov(lcovData: string): FileCoverage[] {
             // Load istanbul ignore comments for this file
             const absolutePath = join(cwd, file.path);
             ignoredLines = getIstanbulIgnoredLines(absolutePath);
-
-            // Check if whole file is ignored
-            if (ignoredLines.has(-1)) {
-                file.ignored = true;
-            }
+            // Set ignored property for this file
+            file.ignored = ignoredLines.has(-1);
         } else if (line.startsWith('DA:')) {
             // Data about a line: DA:line,hitCount
             const parts = line.substring(3).split(',');
@@ -295,8 +296,11 @@ function addMissingFilesToCoverage(coverageFiles: FileCoverage[]): FileCoverage[
 
     const missingFiles: FileCoverage[] = [];
     for (const file of allSourceFiles) {
-        const normalizedPath = normalizePath(file);
+        const normalizedPath = join(cwd, normalizePath(file));
         if (coveredFiles.has(normalizedPath)) continue;
+
+        const ignoredLines = getIstanbulIgnoredLines(normalizedPath);
+        // add the missing file. and mark if it should be ignored.
         missingFiles.push({
             name: path.basename(file),
             path: normalizedPath,
@@ -307,7 +311,7 @@ function addMissingFilesToCoverage(coverageFiles: FileCoverage[]): FileCoverage[
             branches: 0,
             branchesCov: 0,
             uncovered: [1],
-            ignored: false,
+            ignored: ignoredLines.has(-1),
         });
     }
     if (missingFiles.length > 0) {

@@ -1,106 +1,67 @@
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
-import { createServer, registerRoutes } from './server';
+import { afterEach, beforeEach, describe, test } from 'node:test';
+import { sleep } from '../shared/utils';
+import { createServer, registerRoutes, startServer } from './server';
 
 describe('Static file serving', () => {
-    // Note: Direct HTML serving tests via inject() hang with @fastify/static + Bun
-    // This appears to be a compatibility issue between @fastify/static wildcard routes
-    // and Bun's test runner. The functionality works correctly with real HTTP requests.
-    // Integration tests in ci/ folder verify actual HTTP behavior.
+    // Use real HTTP requests instead of inject() to avoid @fastify/static + Bun compatibility issue
+    let server: Awaited<ReturnType<typeof createServer>>;
+    let testPort: number;
+    let serverPromise: Promise<void>;
 
-    test.skip('should serve index.html at root path', async () => {
-        // Skipped due to @fastify/static + Bun inject() compatibility issue
-        // Verified manually via integration tests
-        const app = createServer();
-        await registerRoutes(app);
-        await app.ready();
+    beforeEach(async () => {
+        testPort = 13500 + Math.floor(Math.random() * 100); // Random port 13500-13599
+        process.env.PORT = String(testPort);
+        process.env.HOST = '127.0.0.1';
 
-        const res = await app.inject({
-            method: 'GET',
-            url: '/',
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.headers['content-type'], 'text/html; charset=UTF-8');
-        assert.ok(res.body.includes('<!DOCTYPE html>'));
-        assert.ok(res.body.includes('Fastify Bun Starter'));
-        assert.ok(res.body.includes('/docs'));
-        assert.ok(res.body.includes('/mcp'));
-        assert.ok(res.body.includes('/health'));
-
-        await app.close();
+        server = createServer();
+        await registerRoutes(server);
+        serverPromise = startServer(server);
+        await sleep(100); // Give server time to start
     });
 
-    test.skip('should serve index.html explicitly', async () => {
-        // Skipped due to @fastify/static + Bun inject() compatibility issue
-        const app = createServer();
-        await registerRoutes(app);
-        await app.ready();
+    afterEach(async () => {
+        await server.close();
+        await serverPromise;
+    });
 
-        const res = await app.inject({
-            method: 'GET',
-            url: '/index.html',
-        });
+    test('should serve index.html at root path', async () => {
+        const res = await fetch(`http://127.0.0.1:${testPort}/`);
 
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.headers['content-type'], 'text/html; charset=UTF-8');
-        assert.ok(res.body.includes('Fastify Bun Starter'));
+        assert.equal(res.status, 200);
+        assert.ok(res.headers.get('content-type')?.includes('text/html'));
 
-        await app.close();
+        const body = await res.text();
+        assert.ok(body.includes('<!DOCTYPE html>'));
+    });
+
+    test('should serve index.html explicitly', async () => {
+        const res = await fetch(`http://127.0.0.1:${testPort}/index.html`);
+
+        assert.equal(res.status, 200);
+        assert.ok(res.headers.get('content-type')?.includes('text/html'));
+
+        const body = await res.text();
+        assert.ok(body.includes('<!DOCTYPE html>'));
     });
 
     test('should return 404 for non-existent static file', async () => {
-        const app = createServer();
-        await registerRoutes(app);
-        await app.ready();
-
-        const res = await app.inject({
-            method: 'GET',
-            url: '/nonexistent.html',
-        });
-
-        assert.equal(res.statusCode, 404);
-
-        await app.close();
+        const res = await fetch(`http://127.0.0.1:${testPort}/nonexistent.html`);
+        assert.equal(res.status, 404);
     });
 
-    test.skip('should have correct content type for HTML files', async () => {
-        // Skipped due to @fastify/static + Bun inject() compatibility issue
-        const app = createServer();
-        await registerRoutes(app);
-        await app.ready();
-
-        const res = await app.inject({
-            method: 'GET',
-            url: '/index.html',
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.ok(res.headers['content-type']?.includes('text/html'));
-
-        await app.close();
+    test('should have correct content type for HTML files', async () => {
+        const res = await fetch(`http://127.0.0.1:${testPort}/index.html`);
+        assert.equal(res.status, 200);
+        assert.ok(res.headers.get('content-type')?.includes('text/html'));
     });
 
     test('should not conflict with existing API routes', async () => {
-        const app = createServer();
-        await registerRoutes(app);
-        await app.ready();
-
         // Verify that API routes still work after static plugin is registered
-        const healthRes = await app.inject({
-            method: 'GET',
-            url: '/health',
-        });
+        const healthRes = await fetch(`http://127.0.0.1:${testPort}/health`);
+        assert.equal(healthRes.status, 200);
 
-        assert.equal(healthRes.statusCode, 200);
-
-        const docsRes = await app.inject({
-            method: 'GET',
-            url: '/api/v1/swagger',
-        });
-
-        assert.equal(docsRes.statusCode, 200);
-
-        await app.close();
+        const docsRes = await fetch(`http://127.0.0.1:${testPort}/api/v1/swagger`);
+        assert.equal(docsRes.status, 200);
     });
 });

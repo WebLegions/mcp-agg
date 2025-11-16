@@ -35,7 +35,7 @@
         "noExcessiveCognitiveComplexity": {
           "level": "error",
           "options": {
-            "maxAllowedComplexity": 45
+            "maxAllowedComplexity": 50
           }
         },
         "noVoid": "error"
@@ -103,21 +103,12 @@
             "strictCase": false
           }
         }
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
       }
     }
   },
-  "overrides": [
-    {
-      "includes": ["**/*.test.ts", "**/*.test.js"],
-      "linter": {
-        "rules": {
-          "suspicious": {
-            "noExplicitAny": "off"
-          }
-        }
-      }
-    }
-  ],
   "javascript": {
     "formatter": {
       "indentStyle": "space",

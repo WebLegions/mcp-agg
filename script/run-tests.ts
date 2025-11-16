@@ -35,13 +35,15 @@ const hasSpecificFiles = positionals.length > 0;
 const filesToTest = positionals.length > 0 ? positionals : ['src'];
 let verbose = values.verbose || hasSpecificFiles;
 let buffer = '';
+const start = Date.now();
 
 // Determine if a line should be shown in quiet mode
-const shouldShow = (line: string): boolean => {
+const shouldShow = (line: string, stream: NodeJS.WriteStream): boolean => {
     if (!line || !line.trim()) return false;
 
     // // Once summary starts, show everything
     if (!verbose && /^\s*\d+\s+(pass|fail|skip)/.test(line)) {
+        stream.write(`\n`);
         verbose = true;
     }
 
@@ -76,16 +78,18 @@ const processOutput = (data: string, stream: NodeJS.WriteStream): void => {
     buffer = lines.pop() || '';
 
     for (const line of lines) {
-        if (shouldShow(line)) {
+        if (shouldShow(line, stream)) {
             // Always reset ANSI codes after each line to prevent color bleeding
             stream.write(`${line}\x1b[0m\n`);
+        } else {
+            stream.write(`Elapsed: ${Math.round((Date.now() - start) / 100) / 10}s  \r`);
         }
     }
 };
 
 // Flush remaining buffer
 const flushBuffer = (stream: NodeJS.WriteStream): void => {
-    if (shouldShow(buffer)) {
+    if (shouldShow(buffer, stream)) {
         stream.write(`${buffer}\x1b[0m\n`);
     }
 };

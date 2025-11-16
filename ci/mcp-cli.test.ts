@@ -86,7 +86,16 @@ describe('MCP CLI Integration Tests', () => {
     });
 
     test('mcp add creates stdio server', async () => {
-        const { code, stdout } = await runCLI(['add', '--transport', 'stdio', 'test-stdio', 'npx', '-y', 'test-server']);
+        const { code, stdout } = await runCLI([
+            'add',
+            '--transport',
+            'stdio',
+            '--force',
+            'test-stdio',
+            'npx',
+            '-y',
+            'test-server',
+        ]);
 
         assert.equal(code, 0);
         assert.ok(stdout.includes('Added MCP server'));
@@ -94,7 +103,7 @@ describe('MCP CLI Integration Tests', () => {
     });
 
     test('mcp add creates HTTP server', async () => {
-        const { code, stdout } = await runCLI(['add', '--transport', 'http', 'test-http', 'https://example.com/mcp']);
+        const { code, stdout } = await runCLI(['add', '--transport', 'http', '--force', 'test-http', 'https://example.com/mcp']);
 
         assert.equal(code, 0);
         assert.ok(stdout.includes('Added MCP server'));
@@ -102,7 +111,7 @@ describe('MCP CLI Integration Tests', () => {
     });
 
     test('mcp add creates SSE server', async () => {
-        const { code, stdout } = await runCLI(['add', '--transport', 'sse', 'test-sse', 'https://example.com/sse']);
+        const { code, stdout } = await runCLI(['add', '--transport', 'sse', '--force', 'test-sse', 'https://example.com/sse']);
 
         assert.equal(code, 0);
         assert.ok(stdout.includes('Added MCP server'));
@@ -124,15 +133,15 @@ describe('MCP CLI Integration Tests', () => {
         assert.ok(stdout.includes('stdio'));
     });
 
-    test('mcp remove deletes server with --force', async () => {
-        const { code, stdout } = await runCLI(['remove', 'test-http', '--force']);
+    test('mcp remove deletes server', async () => {
+        const { code, stdout } = await runCLI(['remove', 'test-http']);
         assert.equal(code, 0);
         assert.ok(stdout.includes('Removed MCP server'));
     });
 
     test('Config file persists between commands', async () => {
         // Add server
-        await runCLI(['add', '--transport', 'stdio', 'persist-test', 'node', 'test.js']);
+        await runCLI(['add', '--transport', 'stdio', '--force', 'persist-test', 'node', 'test.js']);
 
         // Verify it exists in a new command
         const { stdout } = await runCLI(['get', 'persist-test']);

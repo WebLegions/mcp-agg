@@ -1,10 +1,10 @@
 import { createInterface } from 'node:readline';
 import * as readline from 'node:readline/promises';
 import { parseArgs } from 'node:util';
-import { connectToMCPServer, getManager, type MCPServerConfig, registerMCPServerTools } from '../controller/mcp-controller';
-import { MCPConfigManager } from '../controller/mcp-controller/config';
-import { type JSONRPCMessage, MCPServer, McpError } from '../lib/mcp-server';
-import { green, red, yellow } from '../util';
+import { connectToMCPServer, getManager, type MCPServerConfig, registerMCPServerTools } from '../controllers/mcp-controller';
+import { MCPConfigManager } from '../controllers/mcp-controller/config';
+import { type JSONRPCMessage, MCPServer, McpError } from '../libs/mcp-server';
+import { green, red, yellow } from '../utils';
 
 const HELP_TEXT = `
 Usage: bun run mcp [options] [command]
@@ -77,7 +77,7 @@ export async function runMCPCLI(args: string[] = process.argv.slice(2)) {
         // Dynamic import to defer env module loading
         // This prevents "Loaded .env file: ..." message when using --json or --help flags
         // The env module checks process.argv internally and suppresses the message
-        await import('../util/env');
+        await import('../shared/utils/env');
 
         const { values, positionals } = parseArgs({
             args,
@@ -113,7 +113,7 @@ export async function runMCPCLI(args: string[] = process.argv.slice(2)) {
         // Show help if no subcommand or --help flag
         if (!subcommand || values.help) {
             console.log(HELP_TEXT);
-            return 1;
+            return 0;
         }
 
         // For 'serve' command, we need file watching enabled
@@ -169,13 +169,16 @@ export async function runMCPCLI(args: string[] = process.argv.slice(2)) {
  */
 /* istanbul ignore next - integration level testing, covered in ci/ */
 async function serveCommand() {
-    const { Env } = await import('../util');
+    const { Env } = await import('../utils');
     const { promise, reject, resolve } = Promise.withResolvers<number>();
     const SERVER_INFO = {
         name: Env.appName,
         version: Env.appVersion,
     };
     const server = new MCPServer(SERVER_INFO);
+
+    // Register builtin tools using shared registration function
+    // (builtin tools are registered without prefix by design)
     await registerMCPServerTools(server);
 
     const rl = createInterface({
@@ -559,25 +562,26 @@ async function removeCommand(manager: ReturnType<typeof getManager>, args: strin
  * List all MCP servers
  */
 async function listCommand(manager: ReturnType<typeof getManager>, options: Record<string, unknown> = {}): Promise<number> {
-    let mcpServer: MCPServer | undefined;
-
     try {
-        // Create MCP server instance and register all tools to get accurate counts
-        const { Env } = await import('../util');
-        const servers = await manager.getAllServers();
-        const SERVER_INFO = {
-            name: Env.appName,
-            version: Env.appVersion,
-        };
-        mcpServer = new MCPServer(SERVER_INFO);
-        await registerMCPServerTools(mcpServer);
+        const allServers = await manager.getAllServers();
+        // Filter out builtin server from user-facing list (it's internal and always present)
+        const servers = allServers.filter((s) => s.name !== 'builtin');
 
-        const tableData: Record<string, { status: string; transport: string; tools: number; 'command/url': string }> = {};
+        // Check for empty list
+        if (servers.length === 0) {
+            if (options.json) {
+                process.stdout.write('{}\n');
+                return 0;
+            }
+            console.log('No MCP servers configured');
+            console.log('Use "bun run mcp add" to add a server');
+            return 0;
+        }
+
+        const tableData: Record<string, { status: string; transport: string; tools: string; 'command/url': string }> = {};
 
         for (const server of servers) {
-            let status: string;
             let commandOrUrl = '';
-            let tools = 0;
 
             if (server.transport === 'stdio') {
                 const stdioServer = server as MCPServerConfig & { command: string; args?: string[] };
@@ -589,24 +593,13 @@ async function listCommand(manager: ReturnType<typeof getManager>, options: Reco
                 commandOrUrl = (server as MCPServerConfig & { url?: string }).url || '';
             }
 
-            // Determine status based on enabled state and tool count availability
-            if (server.enabled === false) {
-                status = 'disabled';
-            } else {
-                const toolsArr = mcpServer.getToolsByPrefix(server.name);
-                if (toolsArr.length > 0) {
-                    status = 'enabled';
-                    tools = toolsArr.length;
-                } else {
-                    status = 'error';
-                    tools = 0;
-                }
-            }
+            // Show status based on enabled field only (don't try to connect)
+            const status = server.enabled === false ? 'disabled' : 'enabled';
 
             tableData[server.name] = {
                 status,
                 transport: server.transport,
-                tools,
+                tools: '-', // Don't try to connect to get tool counts in list view
                 'command/url': commandOrUrl,
             };
         }
@@ -630,12 +623,6 @@ async function listCommand(manager: ReturnType<typeof getManager>, options: Reco
         console.error(`Failed to list servers: ${new McpError(err)}`);
         return 1;
     } finally {
-        // Clean up MCP server instance and all registered tools
-        // Force close all connections (in case any refCounts are wrong)
-        if (mcpServer) {
-            await mcpServer.close(true);
-        }
-
         manager.cleanup(); // Stop file watcher to allow process to exit
     }
 }

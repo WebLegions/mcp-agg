@@ -1,7 +1,7 @@
 import { ok, strictEqual } from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { app } from '../app';
-import { Env } from '../util';
+import { Env } from '../utils';
 
 describe('MCP API - JSON mode', () => {
     test('POST /mcp initialize returns server info', async () => {
@@ -53,14 +53,14 @@ describe('MCP API - JSON mode', () => {
         ok(json.result.tools.length >= 2); // health and format_number
 
         // Check for health tool
-        const healthTool = json.result.tools.find((t: { name: string }) => t.name === 'builtin:health');
+        const healthTool = json.result.tools.find((t: { name: string }) => t.name === 'health');
         ok(healthTool);
-        strictEqual(healthTool.description, '[builtin] Check the health and status of the MCP aggregator service');
+        strictEqual(healthTool.description, 'Check the health and status of the MCP aggregator service');
 
         // Check for format_number tool
-        const formatTool = json.result.tools.find((t: { name: string }) => t.name === 'builtin:format_number');
+        const formatTool = json.result.tools.find((t: { name: string }) => t.name === 'format_number');
         ok(formatTool);
-        strictEqual(formatTool.description, '[builtin] Format a number with thousands separators and optional decimal places');
+        strictEqual(formatTool.description, 'Format a number with thousands separators and optional decimal places');
     });
 
     test('POST /mcp tools/call health returns health status', async () => {
@@ -72,7 +72,7 @@ describe('MCP API - JSON mode', () => {
                 id: 3,
                 method: 'tools/call',
                 params: {
-                    name: 'builtin:health',
+                    name: 'health',
                     arguments: {},
                 },
             },
@@ -87,7 +87,7 @@ describe('MCP API - JSON mode', () => {
         ok(Array.isArray(json.result.content));
         // Health tool now returns JSON with status, uptime, memory, pid
         const healthData = JSON.parse(json.result.content[0].text);
-        strictEqual(healthData.status, 'healthy');
+        strictEqual(healthData.status, 'ok');
         ok(typeof healthData.uptime === 'number');
         ok(healthData.memory);
         ok(typeof healthData.pid === 'number');
@@ -102,7 +102,7 @@ describe('MCP API - JSON mode', () => {
                 id: 4,
                 method: 'tools/call',
                 params: {
-                    name: 'builtin:format_number',
+                    name: 'format_number',
                     arguments: {
                         number: 123456,
                         locale: 'en-US',
@@ -118,8 +118,11 @@ describe('MCP API - JSON mode', () => {
         ok(json.result);
         ok(json.result.content);
         ok(Array.isArray(json.result.content));
-        // format_number now returns just the formatted string
-        strictEqual(json.result.content[0].text, '123,456');
+        // format_number returns JSON with formatted number
+        const formatData = JSON.parse(json.result.content[0].text);
+        strictEqual(formatData.formatted, '123,456');
+        strictEqual(formatData.number, 123456);
+        strictEqual(formatData.locale, 'en-US');
     });
 
     test('POST /mcp tools/call format_number handles large numbers', async () => {
@@ -131,7 +134,7 @@ describe('MCP API - JSON mode', () => {
                 id: 5,
                 method: 'tools/call',
                 params: {
-                    name: 'builtin:format_number',
+                    name: 'format_number',
                     arguments: {
                         number: 1234567890123456, // Large number
                         locale: 'en-US',
@@ -261,7 +264,7 @@ describe('MCP API - JSON mode', () => {
                 id: 12,
                 method: 'tools/call',
                 params: {
-                    name: 'builtin:health',
+                    name: 'health',
                     arguments: {},
                 },
             },
@@ -345,7 +348,7 @@ describe('MCP API - SSE mode', () => {
                 id: 102,
                 method: 'tools/call',
                 params: {
-                    name: 'builtin:health',
+                    name: 'health',
                     arguments: {},
                 },
             },
@@ -362,7 +365,7 @@ describe('MCP API - SSE mode', () => {
         ok(json.result.content);
         // Health tool returns JSON with status: 'healthy'
         const healthData = JSON.parse(json.result.content[0].text);
-        strictEqual(healthData.status, 'healthy');
+        strictEqual(healthData.status, 'ok');
     });
 });
 
@@ -568,7 +571,7 @@ describe('MCP API - Session management', () => {
                 id: 402,
                 method: 'tools/call',
                 params: {
-                    name: 'builtin:health',
+                    name: 'health',
                     arguments: {},
                 },
             },

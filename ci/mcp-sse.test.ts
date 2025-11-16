@@ -6,7 +6,7 @@
 import { ok, strictEqual } from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { describe, test } from 'node:test';
-import { sleep } from '../src/util/sleep';
+import { sleep } from '../src/shared/utils/time';
 
 /**
  * Wait for server to be ready by polling the health endpoint

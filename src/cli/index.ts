@@ -6,7 +6,7 @@
  */
 
 import { parseArgs } from 'node:util';
-import { createLogger, hookConsole } from '../util';
+import { createLogger, hookConsole } from '../utils';
 
 const HELP_TEXT = `
 CLI - Command-line tools

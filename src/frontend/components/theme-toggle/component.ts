@@ -3,17 +3,19 @@
  * A beautiful animated theme toggle inspired by Scalar's dashboard
  */
 
-import { getStorageItem, setStorageItem } from '../../util/storage';
-
 const THEME_KEY = 'theme';
 
 /**
  * Get the current theme preference
  */
 function getThemePreference(): 'dark' | 'light' {
-    const savedTheme = getStorageItem(THEME_KEY);
-    if (savedTheme === 'dark' || savedTheme === 'light') {
-        return savedTheme;
+    try {
+        const savedTheme = localStorage.getItem(THEME_KEY);
+        if (savedTheme === 'dark' || savedTheme === 'light') {
+            return savedTheme;
+        }
+    } catch {
+        // localStorage not available
     }
 
     // Fall back to system preference
@@ -26,7 +28,11 @@ function getThemePreference(): 'dark' | 'light' {
  */
 function applyAndSaveTheme(theme: 'dark' | 'light'): void {
     document.documentElement.setAttribute('color-scheme', theme);
-    setStorageItem(THEME_KEY, theme);
+    try {
+        localStorage.setItem(THEME_KEY, theme);
+    } catch {
+        // localStorage not available
+    }
 }
 
 /**

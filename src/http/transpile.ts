@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join, matchesGlob, normalize, resolve } from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { Env } from '../util/env';
+import { Env } from '../shared/utils/env';
 import type { WithParams, WithQuerystring } from './route-types';
 
 type FileType = 'ts' | 'js' | 'cjs' | 'mjs' | 'css' | 'json';
@@ -21,7 +21,7 @@ const cache = new Map<string, CacheEntry>();
 /**
  * Test file glob patterns to exclude from serving
  */
-const TEST_FILE_GLOBS = ['**/*.{test,spec}.*', '**/{test,spec}/**'];
+const TEST_FILE_GLOBS = ['**/*.{test,spec}.*', '**/{test,spec}/**', '**/__mock__/**'];
 
 /**
  * Check if file path matches test file patterns using glob
@@ -55,11 +55,59 @@ function getFileTypeAndMime(filename: string): [FileType | undefined, string] {
 /**
  * Add .ts extension to relative imports in JavaScript code
  * Transforms: from './foo' or from "../../bar" → from "./foo.ts" or from "../../bar.ts"
+ * Handles directory imports: from '../libs/validator' → from '../libs/validator/index.ts'
  */
-function addTsExtensions(code: string): string {
-    return code.replace(/(from\s+["'])(\.\.?[/\\][^"']+?)(["'])/g, (m, p, path, s) =>
-        path.endsWith('.ts') || /\.[a-zA-Z0-9]+$/.test(path) ? m : `${p}${path}.ts${s}`,
-    );
+async function addTsExtensions(code: string, filePath: string): Promise<string> {
+    const fileDir = resolve(filePath, '..');
+    const importRegex = /(from\s+["'])(\.\.?[/\\][^"']+?)(["'])/g;
+
+    // Collect all matches first
+    const matches: Array<{ match: string; prefix: string; path: string; suffix: string; index: number }> = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = importRegex.exec(code)) !== null) {
+        matches.push({
+            match: match[0],
+            prefix: match[1],
+            path: match[2],
+            suffix: match[3],
+            index: match.index,
+        });
+    }
+
+    // Process matches in reverse to maintain correct indices
+    let result = code;
+    for (let i = matches.length - 1; i >= 0; i--) {
+        const { match, prefix, path, suffix, index } = matches[i];
+
+        // Already has extension, skip
+        if (path.endsWith('.ts') || /\.[a-zA-Z0-9]+$/.test(path)) {
+            continue;
+        }
+
+        // Try to resolve the path to check if it's a directory
+        let replacement: string;
+        try {
+            const resolvedPath = resolve(fileDir, path);
+            const stats = await stat(resolvedPath);
+
+            if (stats.isDirectory()) {
+                // Directory import - add /index.ts
+                replacement = `${prefix}${path}/index.ts${suffix}`;
+            } else {
+                // Regular file - add .ts
+                replacement = `${prefix}${path}.ts${suffix}`;
+            }
+        } catch {
+            // Path doesn't exist or can't be resolved - assume it's a file
+            replacement = `${prefix}${path}.ts${suffix}`;
+        }
+
+        // Replace in result
+        result = result.substring(0, index) + replacement + result.substring(index + match.length);
+    }
+
+    return result;
 }
 
 /**
@@ -90,7 +138,7 @@ async function processFile(filePath: string, minify: boolean): Promise<[string, 
         });
         content = await transpiler.transform(code);
         // Add .ts extensions to relative imports for browser ES modules
-        content = addTsExtensions(content);
+        content = await addTsExtensions(content, filePath);
     }
     // JavaScript minification
     else if ((fileType === 'js' || fileType === 'cjs' || fileType === 'mjs') && minify) {

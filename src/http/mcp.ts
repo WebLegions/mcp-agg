@@ -5,10 +5,10 @@
  */
 
 import type { FastifyInstance, FastifyReply, FastifyRequest, FastifySchema } from 'fastify';
-import { getManager } from '../controller/mcp-controller/config';
-import { registerMCPServerTools } from '../controller/mcp-controller/register';
-import { type JSONRPCMessage, SessionStore } from '../lib/mcp-server';
-import { Env } from '../util';
+import { getManager } from '../controllers/mcp-controller/config';
+import { registerMCPServerTools } from '../controllers/mcp-controller/register';
+import { type JSONRPCMessage, SessionStore } from '../libs/mcp-server';
+import { Env } from '../utils';
 
 /**
  * Extended Fastify schema with OpenAPI/Swagger documentation fields
@@ -28,6 +28,9 @@ const SERVER_INFO = {
     name: Env.appName,
     version: Env.appVersion,
 };
+
+// Track if config manager has been setup to prevent duplicate event listeners
+let configManagerSetup = false;
 
 /**
  * Get or create MCP server for a session
@@ -275,6 +278,12 @@ Session management:
  * Call this once during server initialization
  */
 function setupConfigManager(): void {
+    // Only setup once to prevent duplicate event listeners
+    if (configManagerSetup) {
+        return;
+    }
+    configManagerSetup = true;
+
     // Disable file watching in test environment to prevent hanging
     const isTest = process.env.NODE_ENV === 'test' || process.env.BUN_ENV === 'test';
     const watch = !isTest;
