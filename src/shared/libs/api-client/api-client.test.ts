@@ -1,7 +1,8 @@
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert/strict';
 import { describe, mock, test } from 'node:test';
 import { sleep } from '../../utils/time';
-import { ApiClient, ClientOptions, PromiseRetry, SSESession } from './api-client';
+import { ApiClient, ClientOptions, PromiseRetry } from './api-client';
+import { SSESession } from './sse-session';
 
 describe('ResilientClient', () => {
     const baseURL = 'https://api.example.com';

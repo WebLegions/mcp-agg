@@ -1,7 +1,8 @@
-import { readFile, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join, matchesGlob, normalize, resolve } from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Env } from '../shared/utils/env';
+import { stat } from '../utils';
 import type { WithParams, WithQuerystring } from './route-types';
 
 type FileType = 'ts' | 'js' | 'cjs' | 'mjs' | 'css' | 'json';
@@ -11,7 +12,7 @@ type FileType = 'ts' | 'js' | 'cjs' | 'mjs' | 'css' | 'json';
  */
 interface CacheEntry {
     content: string;
-    mtime: number;
+    mtime: number | bigint;
     minified: boolean;
     mimeType: string;
 }
@@ -53,7 +54,7 @@ function getFileTypeAndMime(filename: string): [FileType | undefined, string] {
 }
 
 /**
- * Add .ts extension to relative imports in JavaScript code
+ * Add .ts extension to relative imports in transpiled JavaScript code
  * Transforms: from './foo' or from "../../bar" → from "./foo.ts" or from "../../bar.ts"
  * Handles directory imports: from '../libs/validator' → from '../libs/validator/index.ts'
  */
@@ -80,30 +81,26 @@ async function addTsExtensions(code: string, filePath: string): Promise<string> 
     for (let i = matches.length - 1; i >= 0; i--) {
         const { match, prefix, path, suffix, index } = matches[i];
 
-        // Already has extension, skip
-        if (path.endsWith('.ts') || /\.[a-zA-Z0-9]+$/.test(path)) {
+        let replacement: string | undefined;
+        const resolvedPath = resolve(fileDir, path);
+        const [stats, _err] = await stat(resolvedPath);
+
+        if (stats?.isDirectory()) {
+            // Directory import - add /index.ts
+            replacement = `${prefix}${path}/index.ts${suffix}`;
+        } else if (stats) {
+            // Exists as file - where good
             continue;
-        }
-
-        // Try to resolve the path to check if it's a directory
-        let replacement: string;
-        try {
-            const resolvedPath = resolve(fileDir, path);
-            const stats = await stat(resolvedPath);
-
-            if (stats.isDirectory()) {
-                // Directory import - add /index.ts
-                replacement = `${prefix}${path}/index.ts${suffix}`;
-            } else {
-                // Regular file - add .ts
+        } else {
+            // if path does not exist and no extension -> assume .ts
+            if (!/\.[a-zA-Z0-9]+$/.test(path)) {
                 replacement = `${prefix}${path}.ts${suffix}`;
+            } else {
+                // not found and has extension - we canoot do much about it
+                continue;
             }
-        } catch {
-            // Path doesn't exist or can't be resolved - assume it's a file
-            replacement = `${prefix}${path}.ts${suffix}`;
         }
 
-        // Replace in result
         result = result.substring(0, index) + replacement + result.substring(index + match.length);
     }
 
@@ -115,8 +112,8 @@ async function addTsExtensions(code: string, filePath: string): Promise<string> 
  * Returns [content, mimeType] tuple
  */
 async function processFile(filePath: string, minify: boolean): Promise<[string, string]> {
-    const fileStats = await stat(filePath);
-    const mtime = fileStats.mtimeMs;
+    const [fileStats] = await stat(filePath);
+    const mtime = fileStats?.mtimeMs ?? 0;
     const cacheKey = `${filePath}:${minify}`;
 
     const cached = cache.get(cacheKey);
@@ -137,7 +134,7 @@ async function processFile(filePath: string, minify: boolean): Promise<[string, 
             minifyWhitespace: minify,
         });
         content = await transpiler.transform(code);
-        // Add .ts extensions to relative imports for browser ES modules
+        // Add .ts extensions to relative imports
         content = await addTsExtensions(content, filePath);
     }
     // JavaScript minification
@@ -191,21 +188,33 @@ export function registerTranspile(app: FastifyInstance, localPath: string, remot
             },
         },
         async (req: FastifyRequest<FileServe>, reply: FastifyReply) => {
-            const filename = req.params['*'];
+            let filename = req.params['*'];
             const { minify: minifyParam } = req.query;
 
             try {
+                // If no extension provided, try adding .ts
+                if (!/\.[a-zA-Z0-9]+$/.test(filename)) {
+                    const tsPath = resolve(normalize(join(localPath, `${filename}.ts`)));
+                    // Security check before attempting to access
+                    if (tsPath.startsWith(normalizedLocalPath)) {
+                        const [stats] = await stat(tsPath);
+                        if (stats) {
+                            filename = `${filename}.ts`;
+                        }
+                    }
+                }
+
                 // Build and normalize the full path
                 const requestedPath = resolve(normalize(join(localPath, filename)));
 
                 // Security: ensure the resolved path is within the allowed directory
                 if (!requestedPath.startsWith(normalizedLocalPath)) {
-                    return reply.code(404).send({ error: 'File not found' });
+                    return reply.code(404).type('text/plain').send('File not found');
                 }
 
                 // Security: prevent serving test files
                 if (isTestFile(requestedPath)) {
-                    return reply.code(403).send({ error: 'Access denied' });
+                    return reply.code(404).type('text/plain').send('File not found');
                 }
 
                 // Determine if should minify: query param overrides NODE_ENV
@@ -221,10 +230,10 @@ export function registerTranspile(app: FastifyInstance, localPath: string, remot
                     .send(content);
             } catch (err) {
                 if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-                    return reply.code(404).send({ error: 'File not found' });
+                    return reply.code(404).type('text/plain').send('File not found');
                 }
                 console.error('Error serving file:', err);
-                return reply.code(500).send({ error: 'Internal server error' });
+                return reply.code(500).type('text/plain').send('Internal server error');
             }
         },
     );

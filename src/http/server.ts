@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { getSystemErrorName } from 'node:util';
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { Env } from '../shared/utils/env';
 import { fromHumanBytes } from '../shared/utils/text';
 import { replacerFn, reviverFn } from '../utils/immutable';
@@ -13,6 +13,7 @@ import { registerStatic } from './static';
 import { registerSwagger } from './swagger';
 import { registerTranspile } from './transpile';
 import { type Provider, schemaCompiler, serializerCompiler } from './type-provider';
+import { ErrorEx } from '../shared/utils';
 
 /**
  * Get user-friendly error message from any error type
@@ -92,7 +93,7 @@ export function createServer() {
             const json = JSON.parse(text, reviverFn);
             done(null, json);
         } catch (err) {
-            done(err instanceof Error ? err : new Error(String(err)), undefined);
+            done(err instanceof Error ? err : new ErrorEx(err), undefined);
         }
     });
 
@@ -107,20 +108,20 @@ export function createServer() {
 /**
  * Register all routes and plugins
  */
-export async function registerRoutes(app: ReturnType<typeof createServer>) {
-    // Register security plugins FIRST (order matters!)
+export async function registerRoutes(app: FastifyInstance) {
+    // Security plugins FIRST (order matters!)
     await registerSecurityPlugins(app);
 
-    // Register Swagger plugin BEFORE routes (to capture route schemas during registration)
+    // Swagger plugin BEFORE routes (to capture route schemas during registration)
     await registerSwagger(app);
 
-    // Register all HTTP routes
+    // API routes
     registerHealth(app);
     registerHello(app);
     registerMCP(app);
     registerConfig(app); // MCP server configuration CRUD API
 
-    // Register transpile routes for frontend app.
+    // Transpiled routes for frontend app.
     const frontend = join(__dirname, '..', 'frontend');
     const shared = join(__dirname, '..', 'shared');
 
@@ -130,10 +131,10 @@ export async function registerRoutes(app: ReturnType<typeof createServer>) {
     registerTranspile(app, join(frontend, 'views'), '/public/views');
     registerTranspile(app, join(frontend, 'types'), '/public/types');
 
-    // Register shared folder (accessible to both frontend and backend)
+    // Shared folder (accessible to both frontend and backend)
     registerTranspile(app, shared, '/shared');
 
-    // Register static file serving (must be last to avoid route conflicts)
+    // Static file serving (must be last to avoid route conflicts)
     await registerStatic(app, '../public', '/');
 }
 
