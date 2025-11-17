@@ -24,12 +24,7 @@ export interface Provider extends FastifyTypeProvider {
  * Check if a value is a Validator instance
  */
 function isValidator<T = unknown>(schema: Validator<T> | Record<string, Validator>): schema is Validator<T> {
-    return (
-        typeof schema === 'object' &&
-        schema !== null &&
-        '_checks' in schema &&
-        typeof (schema as Validator<T>).parse === 'function'
-    );
+    return typeof schema === 'object' && schema !== null && 'parse' in schema && typeof schema.parse === 'function';
 }
 
 /**
@@ -52,7 +47,7 @@ export const schemaCompiler: FastifySchemaCompiler<Validator | Record<string, Va
             }
 
             // Otherwise, it's a plain object with validators - wrap it
-            const validator = object(schema);
+            const validator = object(schema as Record<string, Validator<unknown>>);
             const result: unknown = validator.parse(data);
             return { value: result };
         } catch (error) {

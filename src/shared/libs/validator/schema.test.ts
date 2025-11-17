@@ -9,13 +9,13 @@ describe('Validator Schema', () => {
     // jsonSchema basic types
     test('should convert primitive types', (t) => {
         const result = toJsonSchema(
-            {
+            object({
                 name: string(),
                 age: number(),
                 active: boolean(),
                 count: bigint(),
                 created: date(),
-            },
+            }),
             defOpts(t),
         );
 
@@ -35,10 +35,10 @@ describe('Validator Schema', () => {
 
     test('should convert object schemas with nesting', (t) => {
         const simple = toJsonSchema(
-            {
+            object({
                 name: string(),
                 age: number(),
-            },
+            }),
             defOpts(t),
         );
 
@@ -53,12 +53,12 @@ describe('Validator Schema', () => {
         });
 
         const nested = toJsonSchema(
-            {
+            object({
                 user: object({
                     name: string(),
                     age: number(),
                 }),
-            },
+            }),
             defOpts(t),
         );
 
@@ -73,7 +73,7 @@ describe('Validator Schema', () => {
         });
 
         const deep = toJsonSchema(
-            {
+            object({
                 data: object({
                     user: object({
                         profile: object({
@@ -81,7 +81,7 @@ describe('Validator Schema', () => {
                         }),
                     }),
                 }),
-            },
+            }),
             defOpts(t),
         );
 
@@ -102,10 +102,10 @@ describe('Validator Schema', () => {
 
     test('should handle optional properties', (t) => {
         const result = toJsonSchema(
-            {
+            object({
                 name: string(),
                 email: string().optional(),
-            },
+            }),
             defOpts(t),
         );
 
@@ -121,22 +121,22 @@ describe('Validator Schema', () => {
     });
 
     test('should convert array types', (t) => {
-        const strings = toJsonSchema({ tags: array(string()) }, defOpts(t));
+        const strings = toJsonSchema(object({ tags: array(string()) }), defOpts(t));
         deepEqual(strings.properties?.tags, {
             type: 'array',
             items: { type: 'string' },
         });
 
-        const numbers = toJsonSchema({ scores: array(number()) }, defOpts(t));
+        const numbers = toJsonSchema(object({ scores: array(number()) }), defOpts(t));
         deepEqual(numbers.properties?.scores, {
             type: 'array',
             items: { type: 'number' },
         });
 
         const objects = toJsonSchema(
-            {
+            object({
                 users: array(object({ name: string(), age: number() })),
-            },
+            }),
             defOpts(t),
         );
         deepEqual(objects.properties?.users, {
@@ -152,10 +152,10 @@ describe('Validator Schema', () => {
             },
         });
 
-        const generic = toJsonSchema({ items: array() }, defOpts(t));
+        const generic = toJsonSchema(object({ items: array() }), defOpts(t));
         deepEqual(generic.properties?.items, { type: 'array' });
 
-        const nested = toJsonSchema({ matrix: array(array(number())) }, defOpts(t));
+        const nested = toJsonSchema(object({ matrix: array(array(number())) }), defOpts(t));
         deepEqual(nested.properties?.matrix, {
             type: 'array',
             items: {
@@ -167,9 +167,9 @@ describe('Validator Schema', () => {
 
     test('should convert union types', (t) => {
         const primitives = toJsonSchema(
-            {
+            object({
                 value: union([string(), number()]),
-            },
+            }),
             defOpts(t),
         );
         deepEqual(primitives.properties?.value, {
@@ -177,9 +177,9 @@ describe('Validator Schema', () => {
         });
 
         const withBoolean = toJsonSchema(
-            {
+            object({
                 flag: union([string(), boolean()]),
-            },
+            }),
             defOpts(t),
         );
         deepEqual(withBoolean.properties?.flag, {
@@ -187,9 +187,9 @@ describe('Validator Schema', () => {
         });
 
         const three = toJsonSchema(
-            {
+            object({
                 data: union([string(), number(), boolean()]),
-            },
+            }),
             defOpts(t),
         );
         deepEqual(three.properties?.data, {
@@ -197,9 +197,9 @@ describe('Validator Schema', () => {
         });
 
         const optional = toJsonSchema(
-            {
+            object({
                 value: union([string(), number()]).optional(),
-            },
+            }),
             defOpts(t),
         );
         deepEqual(optional.properties?.value, {
@@ -209,52 +209,52 @@ describe('Validator Schema', () => {
     });
 
     test('should convert literal types', (t) => {
-        const stringLit = toJsonSchema({ status: literal('pending') }, defOpts(t));
+        const stringLit = toJsonSchema(object({ status: literal('pending') }), defOpts(t));
         deepEqual(stringLit.properties?.status, {
             type: 'string',
             const: 'pending',
         });
 
-        const numberLit = toJsonSchema({ code: literal(404) }, defOpts(t));
+        const numberLit = toJsonSchema(object({ code: literal(404) }), defOpts(t));
         deepEqual(numberLit.properties?.code, {
             type: 'number',
             const: 404,
         });
 
-        const boolLit = toJsonSchema({ enabled: literal(true) }, defOpts(t));
+        const boolLit = toJsonSchema(object({ enabled: literal(true) }), defOpts(t));
         deepEqual(boolLit.properties?.enabled, {
             type: 'boolean',
             const: true,
         });
 
-        const nullLit = toJsonSchema({ data: literal(null) }, defOpts(t));
+        const nullLit = toJsonSchema(object({ data: literal(null) }), defOpts(t));
         deepEqual(nullLit.properties?.data, {
             type: 'null',
         });
     });
 
     test('should convert nullable types', (t) => {
-        const str = toJsonSchema({ name: nullable(string()) }, defOpts(t));
+        const str = toJsonSchema(object({ name: nullable(string()) }), defOpts(t));
         deepEqual(str.properties?.name, {
             type: ['string', 'null'],
         });
 
-        const num = toJsonSchema({ count: nullable(number()) }, defOpts(t));
+        const num = toJsonSchema(object({ count: nullable(number()) }), defOpts(t));
         deepEqual(num.properties?.count, {
             type: ['number', 'null'],
         });
 
-        const bool = toJsonSchema({ active: nullable(boolean()) }, defOpts(t));
+        const bool = toJsonSchema(object({ active: nullable(boolean()) }), defOpts(t));
         deepEqual(bool.properties?.active, {
             type: ['boolean', 'null'],
         });
 
-        const arr = toJsonSchema({ tags: nullable(array(string())) }, defOpts(t));
+        const arr = toJsonSchema(object({ tags: nullable(array(string())) }), defOpts(t));
         deepEqual(arr.properties?.tags, {
             anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'null' }],
         });
 
-        const optNull = toJsonSchema({ name: nullable(string()).optional() }, defOpts(t));
+        const optNull = toJsonSchema(object({ name: nullable(string()).optional() }), defOpts(t));
         deepEqual(optNull.properties?.name, {
             type: ['string', 'null'],
         });
@@ -262,13 +262,13 @@ describe('Validator Schema', () => {
     });
 
     test('should convert nullish types', (t) => {
-        const str = toJsonSchema({ name: nullish(string()) }, defOpts(t));
+        const str = toJsonSchema(object({ name: nullish(string()) }), defOpts(t));
         deepEqual(str.properties?.name, {
             type: ['string', 'null'],
         });
         deepEqual(str.required, []);
 
-        const num = toJsonSchema({ age: nullish(number()) }, defOpts(t));
+        const num = toJsonSchema(object({ age: nullish(number()) }), defOpts(t));
         deepEqual(num.properties?.age, {
             type: ['number', 'null'],
         });
@@ -276,39 +276,39 @@ describe('Validator Schema', () => {
     });
 
     test('should convert set and map types', (t) => {
-        const setStr = toJsonSchema({ tags: set(string()) }, defOpts(t));
+        const setStr = toJsonSchema(object({ tags: set(string()) }), defOpts(t));
         deepEqual(setStr.properties?.tags, {
             type: 'array',
             uniqueItems: true,
             items: { type: 'string' },
         });
 
-        const setNum = toJsonSchema({ ids: set(number()) }, defOpts(t));
+        const setNum = toJsonSchema(object({ ids: set(number()) }), defOpts(t));
         deepEqual(setNum.properties?.ids, {
             type: 'array',
             uniqueItems: true,
             items: { type: 'number' },
         });
 
-        const setGen = toJsonSchema({ values: set() }, defOpts(t));
+        const setGen = toJsonSchema(object({ values: set() }), defOpts(t));
         deepEqual(setGen.properties?.values, {
             type: 'array',
             uniqueItems: true,
         });
 
-        const mapStr = toJsonSchema({ metadata: map(string()) }, defOpts(t));
+        const mapStr = toJsonSchema(object({ metadata: map(string()) }), defOpts(t));
         deepEqual(mapStr.properties?.metadata, {
             type: 'object',
             additionalProperties: { type: 'string' },
         });
 
-        const mapNum = toJsonSchema({ counters: map(number()) }, defOpts(t));
+        const mapNum = toJsonSchema(object({ counters: map(number()) }), defOpts(t));
         deepEqual(mapNum.properties?.counters, {
             type: 'object',
             additionalProperties: { type: 'number' },
         });
 
-        const mapGen = toJsonSchema({ data: map() }, defOpts(t));
+        const mapGen = toJsonSchema(object({ data: map() }), defOpts(t));
         deepEqual(mapGen.properties?.data, {
             type: 'object',
             additionalProperties: true,
@@ -317,68 +317,77 @@ describe('Validator Schema', () => {
 
     // Json schema builup
     test('should control schema version inclusion and targets', (t) => {
-        const withVersion = toJsonSchema({ name: string() }, { ...defOpts(t), includeSchemaVersion: true });
+        const withVersion = toJsonSchema(object({ name: string() }), { ...defOpts(t), includeSchemaVersion: true });
         strictEqual(withVersion.$schema, 'http://json-schema.org/draft-07/schema#');
 
-        const schema2019 = toJsonSchema(
-            { name: string() },
-            { ...defOpts(t), includeSchemaVersion: true, target: 'jsonSchema2019-09' },
-        );
+        const schema2019 = toJsonSchema(object({ name: string() }), {
+            ...defOpts(t),
+            includeSchemaVersion: true,
+            target: 'jsonSchema2019-09',
+        });
         strictEqual(schema2019.$schema, 'https://json-schema.org/draft/2019-09/schema');
 
-        const schema2020 = toJsonSchema(
-            { name: string() },
-            { ...defOpts(t), includeSchemaVersion: true, target: 'jsonSchema2020-12' },
-        );
+        const schema2020 = toJsonSchema(object({ name: string() }), {
+            ...defOpts(t),
+            includeSchemaVersion: true,
+            target: 'jsonSchema2020-12',
+        });
         strictEqual(schema2020.$schema, 'https://json-schema.org/draft/2020-12/schema');
 
-        const openApi = toJsonSchema({ name: string() }, { ...defOpts(t), includeSchemaVersion: true, target: 'openApi3' });
+        const openApi = toJsonSchema(object({ name: string() }), {
+            ...defOpts(t),
+            includeSchemaVersion: true,
+            target: 'openApi3',
+        });
         strictEqual(openApi.$schema, undefined);
 
-        const noVersion = toJsonSchema({ name: string() });
+        const noVersion = toJsonSchema(object({ name: string() }));
         strictEqual(noVersion.$schema, undefined);
     });
 
     test('should handle naming and definition paths', (t) => {
-        const withName = toJsonSchema({ name: string() }, { name: 'User', title: 'USER' });
+        const withName = toJsonSchema(object({ name: string() }), { name: 'User', title: 'USER' });
         strictEqual(withName.$ref, '#/definitions/User');
-        ok((withName as Record<string, unknown>).definitions);
-        ok(((withName as Record<string, unknown>).definitions as Record<string, unknown>).User);
+        ok(Object(withName).definitions);
+        ok(Object(withName).definitions.User);
 
-        const customPath = toJsonSchema(
-            { name: string() },
-            { ...defOpts(t), name: 'User', definitionPath: 'definitions', includeSchemaVersion: false },
-        ) as Record<string, unknown>;
-        strictEqual(customPath.$ref, '#/definitions/User');
-        ok(customPath.definitions);
-        ok((customPath.definitions as Record<string, unknown>).User);
+        const customPath = toJsonSchema(object({ name: string() }), {
+            ...defOpts(t),
+            name: 'User',
+            definitionPath: 'definitions',
+            includeSchemaVersion: false,
+        });
+        strictEqual(Object(customPath).$ref, '#/definitions/User');
+        ok(Object(customPath).definitions);
+        ok(Object(customPath).definitions.User);
 
-        const stringAsName = toJsonSchema({ name: string() }, 'User');
-        strictEqual(stringAsName.$ref, '#/definitions/User');
-        ok((stringAsName as Record<string, unknown>).definitions);
-        ok(((stringAsName as Record<string, unknown>).definitions as Record<string, unknown>).User);
+        const stringAsName = toJsonSchema(object({ name: string() }), 'User');
+        strictEqual(Object(stringAsName).$ref, '#/definitions/User');
+        ok(Object(stringAsName).definitions);
+        ok(Object(stringAsName).definitions.User);
     });
 
     test('should control additional properties', (t) => {
-        const allowed = toJsonSchema(
-            { name: string() },
-            { ...defOpts(t), includeSchemaVersion: false, additionalProperties: true },
-        );
+        const allowed = toJsonSchema(object({ name: string() }), {
+            ...defOpts(t),
+            includeSchemaVersion: false,
+            additionalProperties: true,
+        });
         strictEqual(allowed.additionalProperties, true);
 
-        const disallowed = toJsonSchema({ name: string() }, defOpts(t));
+        const disallowed = toJsonSchema(object({ name: string() }), defOpts(t));
         strictEqual(disallowed.additionalProperties, false);
     });
 
     test('should convert complex schemas', (t) => {
         const userSchema = toJsonSchema(
-            {
+            object({
                 id: number(),
                 name: string(),
                 email: string().optional(),
                 roles: array(string()),
                 isActive: boolean(),
-            },
+            }),
             { ...defOpts(t), includeSchemaVersion: false },
         );
 
@@ -399,7 +408,7 @@ describe('Validator Schema', () => {
         });
 
         const nested = toJsonSchema(
-            {
+            object({
                 company: object({
                     name: string(),
                     employees: array(
@@ -410,7 +419,7 @@ describe('Validator Schema', () => {
                         }),
                     ),
                 }),
-            },
+            }),
             defOpts(t),
         );
 
@@ -430,7 +439,7 @@ describe('Validator Schema', () => {
         });
 
         const mixed = toJsonSchema(
-            {
+            object({
                 id: number(),
                 name: string(),
                 tags: set(string()),
@@ -438,7 +447,7 @@ describe('Validator Schema', () => {
                 status: literal('active'),
                 count: nullable(number()),
                 optional: string().optional(),
-            },
+            }),
             defOpts(t),
         );
 
@@ -450,7 +459,7 @@ describe('Validator Schema', () => {
     });
 
     test('should handle edge cases', (t) => {
-        const empty = toJsonSchema({}, defOpts(t));
+        const empty = toJsonSchema(object({}), defOpts(t));
         deepEqual(empty, {
             type: 'object',
             properties: {},
@@ -461,9 +470,9 @@ describe('Validator Schema', () => {
 
     test('should include descriptions', (t) => {
         const simple = toJsonSchema(
-            {
+            object({
                 name: string().describe('The user name'),
-            },
+            }),
             defOpts(t),
         );
         ok(simple.properties);
@@ -473,9 +482,9 @@ describe('Validator Schema', () => {
         });
 
         const withConstraints = toJsonSchema(
-            {
+            object({
                 age: number().min(0).max(120).describe('Age in years'),
-            },
+            }),
             defOpts(t),
         );
         ok(withConstraints.properties);
@@ -489,25 +498,25 @@ describe('Validator Schema', () => {
 
     // type constraints
     test('should include number constraints', (t) => {
-        const min = toJsonSchema({ age: number().min(18) }, defOpts(t));
+        const min = toJsonSchema(object({ age: number().min(18) }), defOpts(t));
         deepEqual(min.properties?.age, { type: 'number', minimum: 18 });
 
-        const max = toJsonSchema({ age: number().max(65) }, defOpts(t));
+        const max = toJsonSchema(object({ age: number().max(65) }), defOpts(t));
         deepEqual(max.properties?.age, { type: 'number', maximum: 65 });
 
-        const gtNum = toJsonSchema({ score: number().gt(0) }, defOpts(t));
+        const gtNum = toJsonSchema(object({ score: number().gt(0) }), defOpts(t));
         deepEqual(gtNum.properties?.score, { type: 'number', exclusiveMinimum: 0 });
 
-        const ltNum = toJsonSchema({ score: number().lt(100) }, defOpts(t));
+        const ltNum = toJsonSchema(object({ score: number().lt(100) }), defOpts(t));
         deepEqual(ltNum.properties?.score, { type: 'number', exclusiveMaximum: 100 });
 
-        const multiple = toJsonSchema({ price: number().multipleOf(0.01) }, defOpts(t));
+        const multiple = toJsonSchema(object({ price: number().multipleOf(0.01) }), defOpts(t));
         deepEqual(multiple.properties?.price, { type: 'number', multipleOf: 0.01 });
 
         const combined = toJsonSchema(
-            {
+            object({
                 percentage: number().min(0).max(100).multipleOf(0.1),
-            },
+            }),
             defOpts(t),
         );
         deepEqual(combined.properties?.percentage, {
@@ -519,22 +528,22 @@ describe('Validator Schema', () => {
     });
 
     test('should include string constraints', (t) => {
-        const min = toJsonSchema({ name: string().min(3) }, defOpts(t));
+        const min = toJsonSchema(object({ name: string().min(3) }), defOpts(t));
         deepEqual(min.properties?.name, { type: 'string', minLength: 3 });
 
-        const max = toJsonSchema({ name: string().max(50) }, defOpts(t));
+        const max = toJsonSchema(object({ name: string().max(50) }), defOpts(t));
         deepEqual(max.properties?.name, { type: 'string', maxLength: 50 });
 
-        const pattern = toJsonSchema({ code: string().regex(/^[A-Z]{3}$/) }, defOpts(t));
+        const pattern = toJsonSchema(object({ code: string().regex(/^[A-Z]{3}$/) }), defOpts(t));
         deepEqual(pattern.properties?.code, { type: 'string', pattern: '^[A-Z]{3}$' });
 
         const combined = toJsonSchema(
-            {
+            object({
                 username: string()
                     .min(3)
                     .max(20)
                     .regex(/^[a-z0-9_]+$/),
-            },
+            }),
             defOpts(t),
         );
         deepEqual(combined.properties?.username, {
@@ -546,14 +555,14 @@ describe('Validator Schema', () => {
     });
 
     test('should include array constraints', (t) => {
-        const min = toJsonSchema({ tags: array(string()).minLength(1) }, defOpts(t));
+        const min = toJsonSchema(object({ tags: array(string()).minLength(1) }), defOpts(t));
         deepEqual(min.properties?.tags, {
             type: 'array',
             items: { type: 'string' },
             minItems: 1,
         });
 
-        const max = toJsonSchema({ tags: array(string()).maxLength(10) }, defOpts(t));
+        const max = toJsonSchema(object({ tags: array(string()).maxLength(10) }), defOpts(t));
         deepEqual(max.properties?.tags, {
             type: 'array',
             items: { type: 'string' },
@@ -561,9 +570,9 @@ describe('Validator Schema', () => {
         });
 
         const combined = toJsonSchema(
-            {
+            object({
                 items: array(number()).minLength(1).maxLength(100),
-            },
+            }),
             defOpts(t),
         );
         deepEqual(combined.properties?.items, {
@@ -576,9 +585,9 @@ describe('Validator Schema', () => {
 
     test('should include default values', (t) => {
         const simple = toJsonSchema(
-            {
+            object({
                 status: string().default('pending'),
-            },
+            }),
             defOpts(t),
         );
         deepEqual(simple.properties?.status, {
@@ -587,9 +596,9 @@ describe('Validator Schema', () => {
         });
 
         const withConstraints = toJsonSchema(
-            {
+            object({
                 count: number().min(0).max(100).default(0),
-            },
+            }),
             defOpts(t),
         );
         deepEqual(withConstraints.properties?.count, {
@@ -601,25 +610,25 @@ describe('Validator Schema', () => {
     });
 
     test('should include bigint constraints', (t) => {
-        const min = toJsonSchema({ count: bigint().min(0n) }, defOpts(t));
+        const min = toJsonSchema(object({ count: bigint().min(0n) }), defOpts(t));
         deepEqual(min.properties?.count, { type: 'integer', minimum: 0 });
 
-        const max = toJsonSchema({ count: bigint().max(1000n) }, defOpts(t));
+        const max = toJsonSchema(object({ count: bigint().max(1000n) }), defOpts(t));
         deepEqual(max.properties?.count, { type: 'integer', maximum: 1000 });
 
-        const gt = toJsonSchema({ id: bigint().gt(0n) }, defOpts(t));
+        const gt = toJsonSchema(object({ id: bigint().gt(0n) }), defOpts(t));
         deepEqual(gt.properties?.id, { type: 'integer', exclusiveMinimum: 0 });
 
-        const lt = toJsonSchema({ id: bigint().lt(9999n) }, defOpts(t));
+        const lt = toJsonSchema(object({ id: bigint().lt(9999n) }), defOpts(t));
         deepEqual(lt.properties?.id, { type: 'integer', exclusiveMaximum: 9999 });
 
-        const multiple = toJsonSchema({ even: bigint().multipleOf(2n) }, defOpts(t));
+        const multiple = toJsonSchema(object({ even: bigint().multipleOf(2n) }), defOpts(t));
         deepEqual(multiple.properties?.even, { type: 'integer', multipleOf: 2 });
     });
 
     // z compatibility
     test('should support zodToJsonSchema alias and z.* methods', (t) => {
-        const basic = z.zodToJsonSchema({ name: z.string() }, defOpts(t));
+        const basic = z.zodToJsonSchema(object({ name: z.string() }), defOpts(t));
         deepEqual(basic, {
             type: 'object',
             properties: {
@@ -629,35 +638,35 @@ describe('Validator Schema', () => {
             additionalProperties: false,
         });
 
-        const named = z.zodToJsonSchema({ name: z.string() }, 'User');
+        const named = z.zodToJsonSchema(object({ name: z.string() }), 'User');
         strictEqual(named.$ref, '#/definitions/User');
-        ok((named as Record<string, unknown>).definitions);
-        ok(((named as Record<string, unknown>).definitions as Record<string, unknown>).User);
+        ok(Object(named).definitions);
+        ok(Object(named).definitions.User);
     });
 
     test('should support object property constraints', (t) => {
         const minProps = z.zodToJsonSchema(
-            {
+            z.object({
                 data: z.object({}).minProperties(1),
-            },
+            }),
             defOpts(t),
         );
         const minDataSchema = minProps.properties?.data as Record<string, unknown>;
         strictEqual(minDataSchema.minProperties, 1);
 
         const maxProps = z.zodToJsonSchema(
-            {
+            z.object({
                 data: z.object({}).maxProperties(10),
-            },
+            }),
             defOpts(t),
         );
         const maxDataSchema = maxProps.properties?.data as Record<string, unknown>;
         strictEqual(maxDataSchema.maxProperties, 10);
 
         const both = z.zodToJsonSchema(
-            {
+            z.object({
                 data: z.object({}).minProperties(1).maxProperties(5),
-            },
+            }),
             defOpts(t),
         );
         const bothDataSchema = both.properties?.data as Record<string, unknown>;
@@ -1026,11 +1035,11 @@ describe('Validator Schema', () => {
     });
 
     test('should handle round-trip for basic types', () => {
-        const original = {
+        const original = object({
             name: string(),
             age: number().gte(0),
             active: boolean(),
-        };
+        });
 
         const jsonSchema = toJsonSchema(original, {
             includeSchemaVersion: true,
@@ -1044,12 +1053,12 @@ describe('Validator Schema', () => {
     });
 
     test('should handle round-trip for nested objects', () => {
-        const original = {
+        const original = object({
             user: object({
                 name: string(),
                 email: string().email(),
             }),
-        };
+        });
 
         const jsonSchema = toJsonSchema(original, {
             includeSchemaVersion: true,
@@ -1063,9 +1072,9 @@ describe('Validator Schema', () => {
     });
 
     test('should handle round-trip for arrays', () => {
-        const original = {
+        const original = object({
             tags: array(string()).minLength(1),
-        };
+        });
 
         const jsonSchema = toJsonSchema(original, {
             includeSchemaVersion: true,

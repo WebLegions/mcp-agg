@@ -3,7 +3,7 @@
  * Uses ResilientClient for HTTP JSON-RPC transport
  */
 
-import { ApiClient } from '../../shared/utils';
+import { ApiClient } from '../../shared/libs/api-client';
 import { type JSONRPCRequest, type JSONRPCResponse, McpError, type ToolDefinition, type ToolResult } from '../mcp-server';
 import { type MCPClient, validators as v } from './client';
 

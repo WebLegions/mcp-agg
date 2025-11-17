@@ -5,8 +5,8 @@
  */
 
 import { mcpHTTPServerSchema, mcpSSEServerSchema, mcpStdioServerSchema } from '../../shared/types/mcp-config';
-import { slugify } from '../../shared/utils';
-import type { McpConfigApp } from '../app/main';
+import { slugify } from '../../shared/utils/text';
+import type { McpConfigApp } from '../main';
 import type { JurisContext, JurisVDOMElement } from '../types/juris';
 import { extractFieldValidators, ValidatorInput } from './validator-input';
 
@@ -29,9 +29,9 @@ function getSchemaForTransport(transport: string) {
 }
 
 export function ServerModal(props: ServerModalProps, ctx: JurisContext): JurisVDOMElement {
-    const showModal = ctx.getState<boolean>('ui.showServerModal', false);
-    const modalMode = ctx.getState<string>('ui.serverModalMode', 'create');
     const { app } = props;
+    const showModal = app.getState<boolean>('ui.showServerModal', false);
+    const modalMode = app.getState<string>('ui.serverModalMode', 'create');
 
     if (!showModal) {
         return { div: {} };
@@ -40,8 +40,7 @@ export function ServerModal(props: ServerModalProps, ctx: JurisContext): JurisVD
     // Helper function to build form fields based on current transport
     // This will be called reactively when transport changes
     const buildFormFields = (): JurisVDOMElement[] => {
-        const transportStateKey = slugify('serverModal', 'transport', { dotNotation: true });
-        const currentTransport = ctx.getState<string>(transportStateKey, 'stdio');
+        const currentTransport = app.getState<string>('serverModal.transport', 'stdio');
         const schema = getSchemaForTransport(currentTransport);
         const validators = extractFieldValidators(schema);
 
@@ -69,10 +68,10 @@ export function ServerModal(props: ServerModalProps, ctx: JurisContext): JurisVD
                         select: {
                             id: slugify('serverModal', 'transport'),
                             name: 'transport',
-                            value: (): string => ctx.getState(transportStateKey, 'stdio'),
+                            value: (): string => app.getState('serverModal.transport', 'stdio'),
                             onChange: (e: Event) => {
                                 const value = (e.target as HTMLSelectElement).value;
-                                ctx.setState(transportStateKey, value);
+                                app.setState('serverModal.transport', value);
                             },
                             children: [
                                 { option: { value: 'stdio', text: 'STDIO' } },
@@ -140,7 +139,7 @@ export function ServerModal(props: ServerModalProps, ctx: JurisContext): JurisVD
         }
 
         // Submit form
-        await app.saveServer(ctx);
+        await app.saveServer();
     };
 
     // Centered lightbox modal with backdrop

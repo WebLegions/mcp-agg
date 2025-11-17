@@ -20,7 +20,6 @@ import {
     object,
     optional,
     parse,
-    type Schema,
     set,
     strictObject,
     string,
@@ -598,7 +597,7 @@ describe('Validator', () => {
 
         // Extra properties ignored
         const result2 = parse(obj2, { name: 'John', extra: 'ignored' });
-        strictEqual((result2 as Record<string, unknown>).extra, undefined);
+        strictEqual(Object(result2).extra, undefined);
     });
 
     test('should coerce types and validate formats', () => {
@@ -768,7 +767,7 @@ describe('Validator', () => {
     });
 
     test('should handle empty arrays and multiple nesting levels', () => {
-        const schema: Schema = object({
+        const schema = object({
             tags: array(string()),
             numbers: array(number()).optional(),
         });

@@ -16,7 +16,8 @@ import { ArrV, type ObjV } from './validator';
 // =================================
 
 // Schema type represents an object validator (aligned with Zod where z.object() returns ZodObject)
-export type Schema = ObjV<Record<string, Validator>>;
+//export type Schema = ObjV<Record<string, Validator>>;
+export type Schema<T extends Record<string, Validator> = Record<string, Validator>> = ObjV<T>;
 
 // JsonSchema extends ValidatorDef and adds schema-composition properties
 export type JsonSchema = Omit<ValidatorDef, 'value'> & {
@@ -90,7 +91,10 @@ interface SeenItem {
  * const jsonSchema = toJsonSchema(schema);
  * ```
  */
-export function toJsonSchema(schema: Schema, options?: ToJsonSchemaOptions | string): JsonSchema {
+export function toJsonSchema<T extends Record<string, Validator>>(
+    schema: Schema<T>,
+    options?: ToJsonSchemaOptions | string,
+): JsonSchema {
     const opts = (
         typeof options === 'string' ? { ...new DefOptions(), name: options } : { ...new DefOptions(), ...options }
     ) as Required<ToJsonSchemaOptions>;
@@ -148,7 +152,7 @@ export function toJsonSchema(schema: Schema, options?: ToJsonSchemaOptions | str
 
     // Add definitions
     if ($defs && Object.keys($defs).length > 0) {
-        (result as Record<string, unknown>)[opts.definitionPath] = $defs;
+        Object(result)[opts.definitionPath] = $defs;
     }
 
     // Add schema version based on target
@@ -182,16 +186,33 @@ export function toJsonSchema(schema: Schema, options?: ToJsonSchemaOptions | str
 // ============================================================================
 
 /**
- * Parse a validator schema (plain object with validators)
+ * Parse a validator schema (ObjV instance or plain object with validators)
  */
-function parseSchema(schema: Schema, refs: Refs): JsonSchema {
-    const result: Record<string, unknown> = {
-        type: 'object',
-        properties: {},
-        required: [],
-    };
+function parseSchema<T extends Record<string, Validator>>(schema: Schema<T> | Record<string, Validator>, refs: Refs): JsonSchema {
+    // Check if schema is a validator instance (ObjV) or a plain object
+    const isObjVInstance = isValidator(schema);
 
-    for (const [key, propValidator] of Object.entries(schema)) {
+    let schemaDef: JsonSchema | undefined;
+    let schemaProps: Record<string, Validator>;
+
+    if (isObjVInstance) {
+        // Get the validator defs which includes minProperties, maxProperties, etc.
+        schemaDef = parseValidator(schema as Schema, refs);
+
+        // Extract the actual schema object from the ObjV instance
+        // ObjV stores the schema in a private _schema property
+        schemaProps = Object(schema)._schema;
+    } else {
+        // Plain object with validators
+        schemaProps = schema as Record<string, Validator>;
+    }
+
+    // Start with properties from the validator defs if available
+    const result = (schemaDef ? { ...schemaDef } : { type: 'object' }) as Record<string, unknown>;
+    result.properties = {};
+    result.required = [];
+
+    for (const [key, propValidator] of Object.entries(schemaProps)) {
         const savedPath = refs.currentPath;
         refs.currentPath = [...savedPath, 'properties', key];
 

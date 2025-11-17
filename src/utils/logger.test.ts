@@ -1,7 +1,7 @@
 import { deepEqual, doesNotThrow, match, notEqual, ok, strictEqual, throws } from 'node:assert/strict';
 import { describe, mock, test } from 'node:test';
 import { format } from 'node:util';
-import { sleep } from '../shared/utils';
+import { sleep } from '../shared/utils/time';
 import * as logger from './logger';
 import { warn } from './logger';
 

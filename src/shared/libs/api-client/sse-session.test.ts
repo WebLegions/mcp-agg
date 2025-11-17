@@ -2,7 +2,7 @@
  * Unit tests for SSESession class in sse-session.ts
  */
 import { ok, rejects, strictEqual } from 'node:assert/strict';
-import { describe, test } from 'node:test';
+import { describe, mock, test } from 'node:test';
 import { sleep } from '../../utils/time';
 import { SSESession } from './sse-session';
 
@@ -506,14 +506,11 @@ test('should handle sendRequest with successful HTTP response (non-202)', async 
         state: { failures: 0 },
     };
 
-    const originalFetch = globalThis.fetch;
-
-    globalThis.fetch = async () => {
-        // Return 200 OK (synchronous response)
+    const mockFetch = mock.method(globalThis, 'fetch', async () => {
         return new Response(JSON.stringify({ success: true }), {
             status: 200,
         });
-    };
+    });
 
     try {
         const session = new SSESession('http://localhost', {}, dummyRetry, mockStream);
@@ -522,10 +519,11 @@ test('should handle sendRequest with successful HTTP response (non-202)', async 
         const result = await session.sendRequest<{ success: boolean }>('test.method');
         ok(result);
         strictEqual(result.success, true);
+        ok(mockFetch.mock.calls.length > 0);
 
         session.close();
     } finally {
-        globalThis.fetch = originalFetch;
+        mock.restoreAll();
     }
 });
 
@@ -547,12 +545,9 @@ test('should handle sendRequest with HTTP error status', async () => {
         state: { failures: 0 },
     };
 
-    const originalFetch = globalThis.fetch;
-
-    globalThis.fetch = async () => {
+    const mockFetch = mock.method(globalThis, 'fetch', async () => {
         return new Response('Server Error', { status: 500, statusText: 'Internal Server Error' });
-    };
-
+    });
     try {
         const session = new SSESession('http://localhost', {}, dummyRetry, mockStream);
         await sleep(20);
@@ -561,8 +556,9 @@ test('should handle sendRequest with HTTP error status', async () => {
             await session.sendRequest('test.method');
         }, /HTTP 500/);
 
+        ok(mockFetch.mock.calls.length > 0);
         session.close();
     } finally {
-        globalThis.fetch = originalFetch;
+        mock.restoreAll();
     }
 });

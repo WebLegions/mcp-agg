@@ -4,7 +4,7 @@
  */
 
 import type { MCPServerConfig } from '../../shared/types/mcp-config';
-import type { McpConfigApp } from '../app/main';
+import type { McpConfigApp } from '../main';
 import type { JurisContext, JurisInstance, JurisVDOMElement } from '../types/juris';
 
 type ServerTableProps = {

@@ -1,6 +1,7 @@
 import { deepStrictEqual, equal, ok, strictEqual } from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { ErrorEx, sleep } from '../../shared/utils';
+import { ErrorEx } from '../../shared/utils/error';
+import { sleep } from '../../shared/utils/time';
 import { MCPServer } from './server';
 import type {
     CancelledNotification,

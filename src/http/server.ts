@@ -2,9 +2,11 @@ import { join } from 'node:path';
 import { getSystemErrorName } from 'node:util';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { Env } from '../shared/utils/env';
+import { ErrorEx } from '../shared/utils/error';
 import { fromHumanBytes } from '../shared/utils/text';
 import { replacerFn, reviverFn } from '../utils/immutable';
 import { registerConfig } from './config';
+import { registerErrorHandler } from './error-handler';
 import { registerHealth } from './health';
 import { registerHello } from './hello';
 import { registerMCP } from './mcp';
@@ -13,7 +15,6 @@ import { registerStatic } from './static';
 import { registerSwagger } from './swagger';
 import { registerTranspile } from './transpile';
 import { type Provider, schemaCompiler, serializerCompiler } from './type-provider';
-import { ErrorEx } from '../shared/utils';
 
 /**
  * Get user-friendly error message from any error type
@@ -98,7 +99,7 @@ export function createServer() {
     });
 
     // Set default reply serializer to handle BigInt globally (for routes without schemas)
-    app.setReplySerializer((payload) => {
+    app.setReplySerializer((payload, _statusCode) => {
         return JSON.stringify(payload, replacerFn, 0);
     });
 
@@ -123,16 +124,13 @@ export async function registerRoutes(app: FastifyInstance) {
 
     // Transpiled routes for frontend app.
     const frontend = join(__dirname, '..', 'frontend');
+    registerTranspile(app, frontend, '/app');
+
     const shared = join(__dirname, '..', 'shared');
-
-    registerTranspile(app, join(frontend, 'components'), '/public/components');
-    registerTranspile(app, join(frontend, 'util'), '/public/util');
-    registerTranspile(app, join(frontend, 'app'), '/public/app');
-    registerTranspile(app, join(frontend, 'views'), '/public/views');
-    registerTranspile(app, join(frontend, 'types'), '/public/types');
-
-    // Shared folder (accessible to both frontend and backend)
     registerTranspile(app, shared, '/shared');
+
+    // Error handlers for nice-looing error page
+    registerErrorHandler(app);
 
     // Static file serving (must be last to avoid route conflicts)
     await registerStatic(app, '../public', '/');

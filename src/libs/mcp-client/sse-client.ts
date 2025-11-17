@@ -3,9 +3,9 @@
  * Uses SSESession from resilient-client for Server-Sent Events transport
  */
 
-import { ApiClient, type ClientOptions, type SSESession } from '../../shared/libs/api-client/api-client';
-import { sleep } from '../../shared/utils';
+import { ApiClient, type ClientOptions, type SSESession } from '../../shared/libs/api-client';
 import { ErrorEx } from '../../shared/utils/error';
+import { sleep } from '../../shared/utils/time';
 import type { ToolDefinition, ToolResult } from '../mcp-server';
 import { type MCPClient, type McpInitializeParams, validators as v } from './client';
 

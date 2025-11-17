@@ -4,7 +4,7 @@
  */
 
 import type { MCPServerConfig } from '../../shared/types/mcp-config';
-import type { McpConfigApp } from '../app/main';
+import type { McpConfigApp } from '../main';
 import type { JurisContext, JurisInstance, JurisVDOM, JurisVDOMElement } from '../types/juris';
 
 type McpConfigPageProps = {
@@ -24,11 +24,6 @@ export function McpConfigPage(props: McpConfigPageProps, ctx: JurisContext): Jur
                                         {
                                             h1: {
                                                 text: '🔧 MCP Aggregator Configuration',
-                                            },
-                                        },
-                                        {
-                                            p: {
-                                                text: 'Manage your Model Context Protocol servers',
                                             },
                                         },
                                     ],

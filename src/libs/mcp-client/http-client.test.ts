@@ -4,8 +4,8 @@
 
 import { strict as assert } from 'node:assert/strict';
 import { afterEach, describe, mock, test } from 'node:test';
+import { ApiClient } from '../../shared/libs/api-client';
 import { PromiseRetry } from '../../shared/libs/api-client/api-client';
-import { ApiClient } from '../../shared/utils';
 import { HttpClient } from './http-client';
 
 describe('http-client', () => {

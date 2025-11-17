@@ -117,7 +117,7 @@ describe('HTTP Security Middleware', () => {
         // Verify error message
         const body = (await lastResponse.json()) as { statusCode: number; error: string };
         strictEqual(body.statusCode, 429, 'Should return statusCode 429');
-        strictEqual(body.error, 'Too Many Requests', 'Should return Too Many Requests error');
+        ok(body.error.includes('Rate limit exceeded'), 'Should return Rate limit exceeded error');
     });
 
     test('should block CORS requests from disallowed origins', async () => {

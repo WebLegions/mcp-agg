@@ -1,4 +1,4 @@
-import type { McpConfigApp } from '../app/main';
+import type { McpConfigApp } from '../main';
 import type { JurisContext, JurisInstance, JurisVDOMElement } from '../types/juris';
 
 type AppShellProps = {
@@ -13,15 +13,10 @@ export function AppShell(_props: AppShellProps, _ctx: JurisContext): JurisVDOMEl
     return {
         div: {
             children: [
-                // Header with branding and theme toggle
+                // Header with navigation
                 {
                     header: {
                         children: [
-                            {
-                                h1: {
-                                    text: 'MCP Aggregator',
-                                },
-                            },
                             {
                                 nav: {
                                     children: [
@@ -44,11 +39,6 @@ export function AppShell(_props: AppShellProps, _ctx: JurisContext): JurisVDOMEl
                                             },
                                         },
                                     ],
-                                },
-                            },
-                            {
-                                div: {
-                                    innerHTML: '<theme-toggle></theme-toggle>',
                                 },
                             },
                         ],
@@ -83,6 +73,11 @@ export function AppShell(_props: AppShellProps, _ctx: JurisContext): JurisVDOMEl
                             },
                         ],
                     },
+                },
+
+                // Theme switch - floating bottom right
+                {
+                    ThemeSwitch: {},
                 },
             ],
         },

@@ -3,7 +3,7 @@
  * Manages a pool of MCP client connections with reference counting
  */
 
-import { ErrorEx } from '../../shared/utils';
+import { ErrorEx } from '../../shared/utils/error';
 import type { MCPClient } from './client';
 
 /**

@@ -3,18 +3,18 @@
  * JurisJS application for managing MCP server configurations
  */
 
-import { ApiClient } from '../../shared/libs/api-client/api-client.js';
-import { z } from '../../shared/libs/validator/index.js';
-import type { MCPServerConfig } from '../../shared/types/mcp-config.js';
-import { mcpServerConfigSchema } from '../../shared/types/mcp-config.js';
-import { Env } from '../../shared/utils/env.js';
-import '../components/index.js'; // Register web components
-import type { JurisConstructor, JurisInstance } from '../types/juris';
-import { registerAppShell } from '../views/app-shell';
-import { registerMcpConfigPage } from '../views/mcp-config-page';
-import { registerServerModal } from '../views/server-modal';
-import { registerServerTable } from '../views/server-table';
+import { ApiClient } from '../shared/libs/api-client';
+import { z } from '../shared/libs/validator';
+import type { MCPServerConfig } from '../shared/types/mcp-config';
+import { mcpServerConfigSchema } from '../shared/types/mcp-config';
+import { Env } from '../shared/utils/env';
+import { registerThemeSwitch } from './components/theme-switch/component';
 import { initialState, type StateKey } from './state';
+import type { JurisConstructor, JurisInstance } from './types/juris';
+import { registerAppShell } from './views/app-shell';
+import { registerMcpConfigPage } from './views/mcp-config-page';
+import { registerServerModal } from './views/server-modal';
+import { registerServerTable } from './views/server-table';
 
 // biome-ignore lint/style/useNamingConvention: Juris is an external library global
 declare const Juris: JurisConstructor;
@@ -32,12 +32,16 @@ class McpConfigApp {
 
     constructor() {
         // Initialize API client with base URL
-        // devs can change the backend url from query string `?apiBase='https:/myapi.com/api`
-        let apiBase = '/api/v1';
-        if (Env.nodeEnv !== 'development') {
+        // Default: same-origin absolute URL for development/production
+        // Optional override on development: set the API on query string `?apiBase=https://api.example.com`
+        let apiBase = `${window.location.origin}/api/v1/`;
+        if (Env.nodeEnv === 'development') {
             const sp = new URLSearchParams(window.location.search);
             const override = sp.get('apiBase');
-            if (override) apiBase = override;
+            if (override) {
+                // User provided full URL for cross-origin API
+                apiBase = override.endsWith('/') ? override : `${override}/`;
+            }
         }
         this._api = new ApiClient(apiBase);
 
@@ -59,7 +63,8 @@ class McpConfigApp {
             },
         });
 
-        // Register all components using the Kanban pattern
+        // Register all components - centralized registration
+        registerThemeSwitch(this.juris);
         registerAppShell(this.juris, this);
         registerMcpConfigPage(this.juris, this);
         registerServerTable(this.juris, this);
@@ -81,7 +86,7 @@ class McpConfigApp {
             this.setState('servers.error', null);
             this.render();
 
-            const data = await this._api.fetch<{ servers: MCPServerConfig[] }>('/config');
+            const data = await this._api.fetch<{ servers: MCPServerConfig[] }>('config');
             this.setState('servers.items', data.servers || []);
             this.setState('servers.loading', false);
             this.render();
@@ -136,12 +141,12 @@ class McpConfigApp {
 
         try {
             if (modalMode === 'create') {
-                await this._api.fetch('/config', {
+                await this._api.fetch('config', {
                     method: 'POST',
                     body: JSON.stringify(validatedConfig),
                 });
             } else {
-                await this._api.fetch(`/config/${name}`, {
+                await this._api.fetch(`config/${name}`, {
                     method: 'PATCH',
                     body: JSON.stringify(validatedConfig),
                 });
@@ -157,7 +162,7 @@ class McpConfigApp {
 
     async enableServer(name: string, currentEnabled: boolean): Promise<void> {
         try {
-            await this._api.fetch(`/config/${name}/enabled`, {
+            await this._api.fetch(`config/${name}/enabled`, {
                 method: 'PATCH',
                 body: JSON.stringify({ enabled: !currentEnabled }),
             });
@@ -174,7 +179,7 @@ class McpConfigApp {
         }
 
         try {
-            await this._api.fetch(`/config/${name}`, { method: 'DELETE' });
+            await this._api.fetch(`config/${name}`, { method: 'DELETE' });
             await this.loadServers();
         } catch (error) {
             console.error('Failed to delete server:', error);
@@ -187,10 +192,14 @@ class McpConfigApp {
     }
 
     /** Type-safe setState wrapper */
-    setState: (key: StateKey, value: unknown) => void = this.juris.setState.bind(this);
+    setState(key: StateKey, value: unknown): void {
+        this.juris.setState(key, value);
+    }
 
     /** Type-safe getState wrapper */
-    getState: <T>(key: StateKey, defaultValue?: T) => T = this.juris.getState.bind(this);
+    getState<T>(key: StateKey, defaultValue?: T): T {
+        return this.juris.getState(key, defaultValue);
+    }
 }
 
 // Initialize the app when the page loads

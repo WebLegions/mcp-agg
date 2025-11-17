@@ -12,7 +12,7 @@
 import cluster, { type Worker } from 'node:cluster';
 import type { PathLike } from 'node:fs';
 import os from 'node:os';
-import { isDebugging } from '../../shared/utils';
+import { isDebugging } from '../../shared/utils/debugger';
 import { createLogger, Env, type LogFn, type Logger, LogLevel } from '../../utils';
 
 /**

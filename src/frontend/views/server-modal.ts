@@ -6,10 +6,10 @@
  */
 
 import { mcpHTTPServerSchema, mcpSSEServerSchema, mcpStdioServerSchema } from '../../shared/types/mcp-config';
-import { dotify, slugify } from '../../shared/utils';
-import type { McpConfigApp } from '../app/main';
+import { dotify, slugify } from '../../shared/utils/text';
 import { BaseModal } from '../components/base-modal';
 import { extractFieldValidators, ValidatorInput } from '../components/validator-input';
+import type { McpConfigApp } from '../main';
 import type { JurisContext, JurisInstance, JurisVDOMElement } from '../types/juris';
 
 type ServerModalProps = {

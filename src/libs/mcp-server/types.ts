@@ -6,7 +6,7 @@
  */
 
 import { array, boolean, type Infer, literal, number, object, record, string, union } from '../../shared/libs/validator';
-import { ErrorEx } from '../../shared/utils';
+import { ErrorEx } from '../../shared/utils/error';
 
 // Constants
 export const JSONRPC_VERSION = '2.0';

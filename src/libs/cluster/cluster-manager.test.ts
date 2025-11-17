@@ -2,7 +2,7 @@ import { ok, strictEqual, throws } from 'node:assert/strict';
 import cluster, { type Worker } from 'node:cluster';
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, test } from 'node:test';
-import { sleep } from '../../shared/utils';
+import { sleep } from '../../shared/utils/time';
 import { ClusterManager, type ClusterStats } from './cluster-manager';
 
 /**

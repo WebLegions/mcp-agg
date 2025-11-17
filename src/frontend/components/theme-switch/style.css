@@ -1,8 +1,12 @@
-:host {
+.theme-switch-container {
 	position: fixed;
 	bottom: 20px;
 	right: 20px;
 	z-index: 1000;
+	width: 38px;
+	height: 24px;
+	overflow: hidden;
+	line-height: 0;
 
 	/* Inherit CSS variables from document */
 	--bg: var(--bg-secondary, #ffffff);
@@ -10,29 +14,23 @@
 	--border: var(--border-color, rgba(128, 128, 128, 0.3));
 }
 
-button {
+.theme-switch-container button {
 	display: flex;
 	height: 24px;
 	width: 38px;
 	align-items: center;
-	padding: 6px 0;
-	margin: -6px 0;
+	padding: 0;
+	margin: 0;
 	position: relative;
 	outline: none;
 	border: none;
 	background: transparent;
 	cursor: pointer;
-	transition: filter 0.2s;
+	line-height: 0;
 }
 
-button:hover {
-	filter: brightness(1.1);
-}
-
-button:focus-visible .track,
-button:focus-visible .thumb {
-	outline: 2px solid var(--fg);
-	outline-offset: -1px;
+.theme-switch-container button:focus-visible .track,
+.theme-switch-container button:focus-visible .thumb {
 }
 
 .track {
@@ -44,8 +42,8 @@ button:focus-visible .thumb {
 }
 
 .thumb {
-	width: 23px;
-	height: 23px;
+	width: 20px;
+	height: 20px;
 	position: absolute;
 	left: 0;
 	border: 1px solid var(--border);
@@ -54,11 +52,16 @@ button:focus-visible .thumb {
 	align-items: center;
 	justify-content: center;
 	background: var(--bg);
-	transition: transform 0.3s ease-in-out;
+	transition: transform 0.3s ease-in-out, filter 0.2s;
+	cursor: pointer;
 }
 
-button[aria-pressed="true"] .thumb {
-	transform: translateX(15px);
+.thumb:hover {
+	filter: brightness(1.1);
+}
+
+.theme-switch-container button[aria-pressed="true"] .thumb {
+	transform: translateX(18px);
 }
 
 .icon {
@@ -120,17 +123,17 @@ button[aria-pressed="true"] .thumb {
 }
 
 /* Dark mode styles */
-button[aria-pressed="true"] .ellipse {
+.theme-switch-container button[aria-pressed="true"] .ellipse {
 	width: 10px;
 	height: 10px;
 	-webkit-mask-image: radial-gradient(circle at 0 100%, pink 10px, transparent 12px);
 	mask-image: radial-gradient(circle at 0 100%, pink 10px, transparent 12px);
 }
 
-button[aria-pressed="true"] .sun-ray {
+.theme-switch-container button[aria-pressed="true"] .sun-ray {
 	transform: scale(0);
 }
 
-button[aria-pressed="true"] .moon-mask {
+.theme-switch-container button[aria-pressed="true"] .moon-mask {
 	transform: translateZ(0);
 }

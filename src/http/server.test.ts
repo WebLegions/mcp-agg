@@ -1,7 +1,7 @@
 import { ok, strictEqual } from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 import type { FastifyInstance } from 'fastify';
-import { sleep } from '../shared/utils';
+import { sleep } from '../shared/utils/time';
 import { createServer, registerRoutes, startServer } from './server';
 
 function getPort(app: FastifyInstance): number {

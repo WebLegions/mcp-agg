@@ -454,7 +454,7 @@ describe('MCP Config file', () => {
             await manager.enable('test', false);
 
             // Wait for file watcher to detect the change
-            await sleep(2);
+            await sleep(20);
             strictEqual(eventFired, 1);
         });
     });

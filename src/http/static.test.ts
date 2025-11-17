@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, test } from 'node:test';
-import { sleep } from '../shared/utils';
+import { sleep } from '../shared/utils/time';
 import { createServer, registerRoutes, startServer } from './server';
 
 describe('Static file serving', () => {
