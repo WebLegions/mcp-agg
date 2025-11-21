@@ -1,6 +1,82 @@
 import assert from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, test } from 'node:test';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { createServer, registerRoutes } from './server';
+import { registerEnvInject } from './transpile';
+
+const MOCK_DIR = path.join(__dirname, '__mock__');
+const TEST_FILENAME = 'test-env.html';
+const TEST_HTML_PATH = path.join(MOCK_DIR, TEST_FILENAME);
+const TEST_ROUTE = '/test-env.html';
+const ENV_SCRIPT_MARKER = '<script>window.env = ';
+
+describe('registerEnvInjectedHtml', () => {
+    let fastify: FastifyInstance;
+
+    beforeEach(async () => {
+        fastify = Fastify();
+        // Ensure mock directory exists
+        try {
+            await fs.mkdir(MOCK_DIR);
+        } catch {}
+        // Create the test HTML file before registering the route
+        await fs.writeFile(TEST_HTML_PATH, '<html><head></head><body>Hello</body></html>');
+        await registerEnvInject(fastify, [TEST_FILENAME], MOCK_DIR);
+        await fastify.listen({ port: 0 });
+    });
+
+    afterEach(async () => {
+        try {
+            await fs.unlink(TEST_HTML_PATH);
+        } catch {}
+        try {
+            await fs.rmdir(MOCK_DIR);
+        } catch {}
+        await fastify.close();
+    });
+
+    test('injects env script into HTML response', async () => {
+        const res = await fastify.inject({ method: 'GET', url: TEST_ROUTE, headers: { accept: 'text/html' } });
+        assert.equal(res.statusCode, 200);
+        assert.match(res.body, new RegExp(ENV_SCRIPT_MARKER));
+        assert.match(res.body, /Hello/);
+    });
+
+    test('returns error for missing file at registration', async () => {
+        // Remove file if exists
+        try {
+            await fs.unlink(TEST_HTML_PATH);
+        } catch {}
+        const fastify404 = Fastify();
+        let threw = false;
+        try {
+            await registerEnvInject(fastify404, [TEST_FILENAME], MOCK_DIR);
+        } catch (err) {
+            threw = true;
+            assert.match(String(err), /File not found/);
+        }
+        assert.ok(threw, 'Should throw error for missing file');
+    });
+
+    test('serves from cache on repeated requests', async () => {
+        // Modify the existing test file with new content
+        await fs.writeFile(TEST_HTML_PATH, '<html><head></head><body>CacheTest</body></html>');
+
+        // First request (cache miss due to mtime change)
+        let res = await fastify.inject({ method: 'GET', url: TEST_ROUTE, headers: { accept: 'text/html' } });
+        assert.equal(res.statusCode, 200);
+        assert.match(res.body, /CacheTest/);
+        assert.equal(res.headers['x-cache'], 'MISS');
+
+        // Second request (should hit cache, x-cache header = HIT)
+        res = await fastify.inject({ method: 'GET', url: TEST_ROUTE, headers: { accept: 'text/html' } });
+        assert.equal(res.statusCode, 200);
+        assert.match(res.body, /CacheTest/);
+        assert.equal(res.headers['x-cache'], 'HIT');
+    });
+});
 
 describe('Transpile endpoint', () => {
     let app: Awaited<ReturnType<typeof createServer>>;

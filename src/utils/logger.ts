@@ -314,6 +314,7 @@ const save = { hooked: false };
 
 export function hookConsole(_logger = logger) {
     if (!save.hooked) {
+        console.info('[Logger] Hooking console.');
         const con = globalThis.console || require('node:console');
         consoleHooks.forEach((key) => {
             Object(save)[key] = Object(con)[key];
@@ -328,6 +329,7 @@ export function hookConsole(_logger = logger) {
                 Object(hooked)[key] = Object(save)[key];
             });
             save.hooked = false;
+            console.info('[Logger] Console unhooked.');
         }
     };
 }

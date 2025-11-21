@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 import type { JurisContext } from '../../types/juris';
-import { ThemeSwitch } from './component';
+import { ThemeSwitch } from '.';
 
 describe('ThemeSwitch Component', () => {
     let mockContext: JurisContext;
@@ -49,16 +49,16 @@ describe('ThemeSwitch Component', () => {
             const children = vdom.div.children;
             assert.ok(Array.isArray(children));
             assert.equal(children.length, 1);
-            assert.ok(children[0].button);
+            assert.ok(children[0].div);
         });
 
         test('should have proper button attributes', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            const button = vdom.div.children[0].button;
+            const button = vdom.div.children[0].div;
             assert.ok(button);
-            assert.equal(button.type, 'button');
+            assert.equal(button.role, 'button');
             assert.equal(button.class, 'theme-switch-button');
             assert.ok(button['aria-pressed']);
             assert.ok(button['aria-label']);
@@ -68,61 +68,58 @@ describe('ThemeSwitch Component', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            const buttonChildren = vdom.div.children[0].button.children;
+            const buttonChildren = vdom.div.children[0].div.children;
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const track = buttonChildren?.find((child: any) => child.div?.class === 'track');
             assert.ok(track);
         });
 
-        test('should have thumb element with icon', () => {
+        test('should have thumb element with svg icon', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            const buttonChildren = vdom.div.children[0].button.children;
+            const buttonChildren = vdom.div.children[0].div.children;
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const thumb = buttonChildren?.find((child: any) => child.div?.class === 'thumb');
             assert.ok(thumb);
 
             const thumbChildren = thumb.div.children;
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
-            const icon = thumbChildren?.find((child: any) => child.div?.class === 'icon');
-            assert.ok(icon);
+            const svg = thumbChildren?.find((child: any) => child.svg?.class === 'theme-icon');
+            assert.ok(svg);
         });
 
-        test('should have 4 sun rays', () => {
+        test('should have 4 sun rays as SVG lines', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            const buttonChildren = vdom.div.children[0].button.children;
+            const buttonChildren = vdom.div.children[0].div.children;
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const thumb = buttonChildren?.find((child: any) => child.div?.class === 'thumb');
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
-            const icon = thumb?.div.children?.find((child: any) => child.div?.class === 'icon');
-            const iconChildren = icon?.div.children || [];
+            const svg = thumb?.div.children?.find((child: any) => child.svg?.class === 'theme-icon');
+            const svgChildren = svg?.svg.children || [];
 
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
-            const sunRays = iconChildren.filter((child: any) => child.span?.class === 'sun-ray');
+            const sunRays = svgChildren.filter((child: any) => child.line?.class === 'sun-ray');
             assert.equal(sunRays.length, 4);
         });
 
-        test('should have ellipse with moon mask', () => {
+        test('should have moon path in SVG', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            const buttonChildren = vdom.div.children[0].button.children;
+            const buttonChildren = vdom.div.children[0].div.children;
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const thumb = buttonChildren?.find((child: any) => child.div?.class === 'thumb');
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
-            const icon = thumb?.div.children?.find((child: any) => child.div?.class === 'icon');
-            const iconChildren = icon?.div.children || [];
+            const svg = thumb?.div.children?.find((child: any) => child.svg?.class === 'theme-icon');
+            const svgChildren = svg?.svg.children || [];
 
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
-            const ellipse = iconChildren.find((child: any) => child.span?.class === 'ellipse');
-            assert.ok(ellipse);
-
-            // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
-            const moonMask = ellipse?.span?.children?.find((child: any) => child.span?.class === 'moon-mask');
-            assert.ok(moonMask);
+            const moon = svgChildren.find((child: any) => child.path?.class === 'moon');
+            assert.ok(moon);
+            assert.ok(moon.path.d); // Should have path data
         });
     });
 
@@ -131,7 +128,7 @@ describe('ThemeSwitch Component', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            const button = vdom.div.children[0].button;
+            const button = vdom.div.children[0].div;
             assert.equal(button['aria-pressed'], 'false');
             assert.equal(button['aria-label'], 'Set dark mode');
         });
@@ -142,7 +139,7 @@ describe('ThemeSwitch Component', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            const button = vdom.div.children[0].button;
+            const button = vdom.div.children[0].div;
             assert.equal(button['aria-pressed'], 'true');
             assert.equal(button['aria-label'], 'Set light mode');
         });
@@ -153,7 +150,7 @@ describe('ThemeSwitch Component', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            const button = vdom.div.children[0].button;
+            const button = vdom.div.children[0].div;
             assert.equal(button['aria-pressed'], 'false');
             assert.equal(button['aria-label'], 'Set dark mode');
         });
@@ -172,7 +169,7 @@ describe('ThemeSwitch Component', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            const button = vdom.div.children[0].button;
+            const button = vdom.div.children[0].div;
             assert.ok(typeof button.onclick === 'function');
         });
 
@@ -183,8 +180,8 @@ describe('ThemeSwitch Component', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            // Create actual DOM button to test click behavior
-            const buttonEl = document.createElement('button');
+            // Create actual DOM div to test click behavior
+            const buttonEl = document.createElement('div');
             buttonEl.setAttribute('aria-pressed', 'false');
             buttonEl.setAttribute('aria-label', 'Set dark mode');
             document.body.appendChild(buttonEl);
@@ -193,7 +190,7 @@ describe('ThemeSwitch Component', () => {
             const clickEvent = new MouseEvent('click', { bubbles: true });
             Object.defineProperty(clickEvent, 'currentTarget', { value: buttonEl });
 
-            vdom.div.children[0].button.onclick?.(clickEvent);
+            vdom.div.children[0].div.onclick?.(clickEvent);
 
             // Check that theme was toggled
             assert.equal(localStorage.getItem('theme'), 'dark');
@@ -209,8 +206,8 @@ describe('ThemeSwitch Component', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            // Create actual DOM button to test click behavior
-            const buttonEl = document.createElement('button');
+            // Create actual DOM div to test click behavior
+            const buttonEl = document.createElement('div');
             buttonEl.setAttribute('aria-pressed', 'true');
             buttonEl.setAttribute('aria-label', 'Set light mode');
             document.body.appendChild(buttonEl);
@@ -219,7 +216,7 @@ describe('ThemeSwitch Component', () => {
             const clickEvent = new MouseEvent('click', { bubbles: true });
             Object.defineProperty(clickEvent, 'currentTarget', { value: buttonEl });
 
-            vdom.div.children[0].button.onclick?.(clickEvent);
+            vdom.div.children[0].div.onclick?.(clickEvent);
 
             // Check that theme was toggled
             assert.equal(localStorage.getItem('theme'), 'light');
@@ -229,66 +226,37 @@ describe('ThemeSwitch Component', () => {
         });
     });
 
-    describe('oncreate lifecycle', () => {
-        test('should have oncreate handler', () => {
+    describe('CSS theming', () => {
+        test('should use classless.css CSS variables', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
+            // Check that style uses CSS variables that reference classless.css
+            const style = vdom.div.style;
+            assert.ok(style['--bg'].includes('var(--card-bg'));
+            assert.ok(style['--fg'].includes('var(--body-color'));
+            assert.ok(style['--border'].includes('var(--border-color'));
+        });
+
+        test('should have oncreate handler (no-op for CSS-only theming)', () => {
+            // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
+            const vdom = ThemeSwitch({}, mockContext) as any;
+
+            // oncreate still exists but doesn't do manual color updates
             assert.ok(typeof vdom.div.oncreate === 'function');
         });
 
-        test('should set CSS custom properties on creation', () => {
-            localStorage.setItem('theme', 'dark');
-            document.documentElement.setAttribute('color-scheme', 'dark');
-
+        test('should use html[color-scheme] selectors for icon visibility', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
-            // Create actual DOM element
-            const divEl = document.createElement('div');
-            document.body.appendChild(divEl);
+            const style = vdom.div.style;
 
-            // Call oncreate
-            vdom.div.oncreate?.({ dom: divEl });
-
-            // Check that custom properties were set
-            assert.ok(divEl.style.getPropertyValue('--bg'));
-            assert.ok(divEl.style.getPropertyValue('--fg'));
-            assert.ok(divEl.style.getPropertyValue('--border'));
-        });
-
-        test('should set light theme colors', () => {
-            localStorage.setItem('theme', 'light');
-            document.documentElement.setAttribute('color-scheme', 'light');
-
-            // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
-            const vdom = ThemeSwitch({}, mockContext) as any;
-
-            const divEl = document.createElement('div');
-            document.body.appendChild(divEl);
-
-            vdom.div.oncreate?.({ dom: divEl });
-
-            assert.equal(divEl.style.getPropertyValue('--bg'), '#ffffff');
-            assert.equal(divEl.style.getPropertyValue('--fg'), '#1e293b');
-            assert.ok(divEl.style.getPropertyValue('--border').includes('128'));
-        });
-
-        test('should set dark theme colors', () => {
-            localStorage.setItem('theme', 'dark');
-            document.documentElement.setAttribute('color-scheme', 'dark');
-
-            // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
-            const vdom = ThemeSwitch({}, mockContext) as any;
-
-            const divEl = document.createElement('div');
-            document.body.appendChild(divEl);
-
-            vdom.div.oncreate?.({ dom: divEl });
-
-            assert.equal(divEl.style.getPropertyValue('--bg'), '#1e293b');
-            assert.equal(divEl.style.getPropertyValue('--fg'), '#e2e8f0');
-            assert.ok(divEl.style.getPropertyValue('--border').includes('255'));
+            // Check that html[color-scheme="dark"] selectors exist for sun/moon icons
+            assert.ok(style['html[color-scheme="dark"] & .sun-ray']);
+            assert.ok(style['html[color-scheme="dark"] & .moon']);
+            assert.ok(style['html[color-scheme="light"] & .sun-ray']);
+            assert.ok(style['html[color-scheme="light"] & .moon']);
         });
     });
 });

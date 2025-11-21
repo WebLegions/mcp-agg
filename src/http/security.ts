@@ -79,12 +79,12 @@ async function registerCors(app: FastifyInstance) {
  * - RATE_LIMIT_MAX_REQUESTS: Maximum requests per window (default: 100)
  */
 async function registerRateLimit(app: FastifyInstance) {
-    const window = Env.get('RATE_LIMIT_WINDOW_MS', 60 * 1000);
+    const timeWindow = Env.get('RATE_LIMIT_WINDOW_MS', 60 * 1000);
     const max = Env.get('RATE_LIMIT_MAX_REQUESTS', 10000);
 
     await app.register(rateLimit, {
-        max: Number(max),
-        timeWindow: Number(window),
+        max,
+        timeWindow,
         // Uses in-memory store by default
         // For multi-server deployments, configure Redis:
         // redis: redisClient,

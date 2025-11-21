@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Model
 
-- Code is written in TypeScript and run using Bun runtime. No build step required for dev or prod.
+- Code is written in TypeScript and run using Bun runtime. No build step required for dev or prod execution (outside of Docker).
+- Frontend Serving: The project serves frontend code by live transpiling it. There is no separate build step for the frontend.
 - Use TDD when coding: design the new code >> build a skeleton >> add unit tests (failing at first) >> write the code into the skeleton >> make the tests pass >> consider additional edge cases to get perfect coverage. When doing a smaller change you can skip the first two steps and go directly to adding new tests to cover the new change.
 - Write code in such a way that tests pass cleanly without errors.
 - Code coverage tracking with Bun's test runner - 80% line coverage is required unless developer has approved adding `istanbul` comment.
@@ -83,7 +84,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Development and tests**: Both use `.env.development` (NODE_ENV=development)
 - **Production**: Environment variables set directly in Dockerfile (`NODE_ENV=production`)
 - **Environment loading**: Attempts to load `.env.{NODE_ENV}`, falls back to defaults if file doesn't exist
-- **Release**: In non-local environments, including QA, Staging and Production, the code is run in a docker image. Use `bun run build` to build the image. This also runs the unit tests as first stage and a vulnerability scan as last stage. Failing test and high/critical volnrabilities fail the build.
+- **Release**: In non-local environments, including QA, Staging and Production, the code is run in a docker image. Use `bun run build` to build the image. This also runs the unit tests as first stage and a vulnerability scan as last stage. Failing test and high/critical volnrabilities fail the build. Note that this "build" refers to the Docker image creation; the code itself is still transpiled at runtime.
 
 ## Commands
 

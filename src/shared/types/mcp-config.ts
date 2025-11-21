@@ -42,36 +42,33 @@ export const mcpHTTPConfigSchema = z.object({
 
 export type MCPHTTPConfig = Infer<typeof mcpHTTPConfigSchema>;
 
-/** Union schema for all transport configurations */
-export const mcpTransportConfigSchema = z.union([mcpStdioConfigSchema, mcpSSEConfigSchema, mcpHTTPConfigSchema]);
-export type MCPTransportConfig = Infer<typeof mcpTransportConfigSchema>;
+/**
+ * Schema for the MCP server persistency
+ */
 
-export const mcpStdioServerSchema = z.object({
+export const mcpGenericSchema = z.object({
     name: z.string().min(1).max(120).describe('Unique server id').examples('my-mcp-server'),
-    transport: z.literal('stdio'),
-    command: z.string().min(1).describe('Command to execute').examples('npx -y @modelcontextprotocol/server-example'),
-    args: z.array(z.string()).optional().describe('Command arguments').examples('--port', '3000'),
-    env: mcpEnvSchema.optional().describe('Environment variables'),
     enabled: z.boolean().optional().describe('Whether server is enabled (default: true)'),
     description: z.string().optional().examples('Example MCP server for testing'),
 });
 
-export const mcpSSEServerSchema = z.object({
-    name: z.string().min(1).max(120).describe('Unique server id').examples('my-mcp-server'),
+export const mcpStdioServerSchema = mcpGenericSchema.extend({
+    transport: z.literal('stdio'),
+    command: z.string().min(1).describe('Command to execute').examples('npx -y @modelcontextprotocol/server-example'),
+    args: z.array(z.string()).optional().describe('Command arguments').examples('[--port, 8080]', '3000'),
+    env: mcpEnvSchema.optional().describe('Environment variables'),
+});
+
+export const mcpSSEServerSchema = mcpGenericSchema.extend({
     transport: z.literal('sse'),
     url: z.string().url().describe('SSE endpoint URL'),
     env: mcpEnvSchema.optional().describe('Environment variables'),
-    enabled: z.boolean().optional().describe('Whether server is enabled (default: true)'),
-    description: z.string().optional().examples('Example MCP server for testing'),
 });
 
-export const mcpHTTPServerSchema = z.object({
-    name: z.string().min(1).max(120).describe('Unique server id').examples('my-mcp-server'),
+export const mcpHTTPServerSchema = mcpGenericSchema.extend({
     transport: z.literal('http'),
     url: z.string().url().describe('HTTP endpoint URL'),
     env: mcpEnvSchema.optional().describe('Environment variables'),
-    enabled: z.boolean().optional().describe('Whether server is enabled (default: true)'),
-    description: z.string().optional().examples('Example MCP server for testing'),
 });
 
 export const mcpServerConfigSchema = z.union([mcpStdioServerSchema, mcpSSEServerSchema, mcpHTTPServerSchema]);
@@ -87,5 +84,5 @@ export const mcpConfigFileSchema = z.object({
 export type MCPConfigFile = Infer<typeof mcpConfigFileSchema>;
 
 export const DEFAULT_MCP_CONFIG: MCPConfigFile = {
-    mcpServers: new Map(),
+    mcpServers: new Map<string, MCPServerConfig>(),
 };

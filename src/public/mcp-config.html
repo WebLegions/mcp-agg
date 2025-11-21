@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,17 +15,14 @@
         document.documentElement.setAttribute('color-scheme', initialTheme ? 'dark' : 'light');
     </script>
 </head>
+
 <body>
     <!-- Juris library from CDN -->
     <script src="https://cdn.jsdelivr.net/npm/juris@0.9.0/juris.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/juris@0.9.0/juris-webcomponent.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/juris@0.9.0/juris-cssextractor.js"></script>
 
     <div id="app"></div>
-
-    <!-- JurisJS Theme Toggle Web Component -->
-    <juris-theme-toggle></juris-theme-toggle>
-
-    <!-- Load application modules -->
     <script type="module" src="/app/main.ts"></script>
 </body>
+
 </html>

@@ -1,5 +1,7 @@
+import { infoIcon, registerIcon } from '../components/icon';
 import type { McpConfigApp } from '../main';
 import type { JurisContext, JurisInstance, JurisVDOMElement } from '../types/juris';
+import { registerEnvInfoModal } from './env-info-modal';
 
 type AppShellProps = {
     app: McpConfigApp;
@@ -9,7 +11,7 @@ type AppShellProps = {
  * Main application shell with header, navigation, and footer
  * Wraps the main content area with persistent UI elements
  */
-export function AppShell(_props: AppShellProps, _ctx: JurisContext): JurisVDOMElement {
+export function AppShell(_props: AppShellProps, ctx: JurisContext): JurisVDOMElement {
     return {
         div: {
             children: [
@@ -75,10 +77,34 @@ export function AppShell(_props: AppShellProps, _ctx: JurisContext): JurisVDOMEl
                     },
                 },
 
-                // Theme switch - floating bottom right
+                // floating bottom right
                 {
-                    ThemeSwitch: {},
+                    div: {
+                        className: 'bottom-right-controls',
+                        style: {
+                            position: 'fixed',
+                            right: '1.5rem',
+                            bottom: '1.5rem',
+                            zIndex: '1000',
+                            display: 'flex',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                        },
+                        children: [
+                            {
+                                Icon: {
+                                    svg: infoIcon,
+                                    onClick: () => ctx.setState('ui.showEnvInfoModal', true),
+                                    ariaLabel: 'Show environment information',
+                                    title: 'Environment Info',
+                                },
+                            },
+                            { ThemeSwitch: {} },
+                        ],
+                    },
                 },
+                { EnvInfoModal: { stateKey: 'ui.showEnvInfoModal' } },
             ],
         },
     };
@@ -88,5 +114,7 @@ export function AppShell(_props: AppShellProps, _ctx: JurisContext): JurisVDOMEl
  * Register AppShell component with Juris
  */
 export function registerAppShell(juris: JurisInstance, app: McpConfigApp) {
+    registerIcon(juris);
+    registerEnvInfoModal(juris);
     juris.registerComponent('AppShell', (props, ctx) => AppShell({ ...props, app }, ctx));
 }

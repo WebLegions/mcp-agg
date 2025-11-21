@@ -1,0 +1,1 @@
+- integrrate docs with [pages-cms](https://github.com/pages-cms/pages-cms)

@@ -204,15 +204,15 @@ describe('HTTP Server', () => {
         await registerRoutes(server1);
         await registerRoutes(server2);
 
-        // Start first server on specified port (from PORT env var)
+        // Start first server on port 0 (random available port)
         const save = { ...process.env };
-        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
-        await server1.listen({ port, host: '127.0.0.1' });
+        await server1.listen({ port: 0, host: '127.0.0.1' });
         const testPort = getPort(server1);
 
         // Set port for second server to the same port (to cause conflict)
         process.env.PORT = String(testPort);
         process.env.HOST = '127.0.0.1';
+        process.env.NODE_TEST_CONTEXT = '1';
 
         try {
             // First server already running (no need for startServer)

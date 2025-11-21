@@ -1,8 +1,9 @@
-import { readFile } from 'node:fs/promises';
+import { watch as watchFile } from 'node:fs';
+import { access, readFile } from 'node:fs/promises';
 import { join, matchesGlob, normalize, resolve } from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Env } from '../shared/utils/env';
-import { stat } from '../utils';
+import { atExit, stat } from '../utils';
 import type { WithParams, WithQuerystring } from './route-types';
 
 type FileType = 'ts' | 'js' | 'cjs' | 'mjs' | 'css' | 'json';
@@ -176,7 +177,6 @@ type FileServe = WithParams<{ '*': string }> & WithQuerystring<{ minify?: string
  * @param remotePath - Remote URL path to serve files at
  */
 export function registerTranspile(app: FastifyInstance, localPath: string, remotePath: string): void {
-    const isDevelopment = process.env.NODE_ENV === 'development';
     const cacheMaxAge = Env.get('TRANSPILE_CACHE_MAX_AGE', 3600);
     const normalizedLocalPath = resolve(localPath);
 
@@ -216,9 +216,8 @@ export function registerTranspile(app: FastifyInstance, localPath: string, remot
                 if (isTestFile(requestedPath)) {
                     return reply.code(404).type('text/plain').send('File not found');
                 }
-
                 // Determine if should minify: query param overrides NODE_ENV
-                const shouldMinify = minifyParam !== undefined ? minifyParam === 'true' : !isDevelopment;
+                const shouldMinify = minifyParam !== undefined ? minifyParam === 'true' : !Env.isDevelopment;
 
                 // Get file content (transpiled/minified as needed) with MIME type
                 const [content, mimeType] = await processFile(requestedPath, shouldMinify);
@@ -238,5 +237,76 @@ export function registerTranspile(app: FastifyInstance, localPath: string, remot
         },
     );
 
+    // In development mode, watch for file changes and clear cache
+    if (Env.isDevelopment) {
+        const watcher = watchFile(normalizedLocalPath, { recursive: true }, (eventType, filename) => {
+            if (filename && (eventType === 'change' || eventType === 'rename')) {
+                cache.clear();
+                console.log(`[transpile] Cache cleared`);
+            }
+        });
+
+        // Clean up watcher on process exit
+        atExit(() => watcher.close());
+    }
+
     console.log(`Transpile route registered: ${remotePath}/* -> ${normalizedLocalPath}`);
+}
+
+/**
+ * Registers custom HTML routes that inject env vars into <head> for specified files, using shared cache.
+ * @param app Fastify instance
+ * @param filesToInject Array of public HTML filenames (e.g. ['index.html', 'mcp-config.html'])
+ * @param publicDir Absolute path to public directory
+ */
+export async function registerEnvInject(app: FastifyInstance, filesToInject: string[], publicDir: string) {
+    for (const file of filesToInject) {
+        const filePath = join(publicDir, file);
+        // Check file existence at registration time
+        await access(filePath).catch(() => {
+            throw new Error(`[env-inject] File not found: ${filePath}`);
+        });
+        app.get(`/${file}`, async (request: FastifyRequest, reply: FastifyReply) => {
+            // Only serve if Accept header prefers text/html
+            try {
+                const accept = request.headers.accept ?? '';
+                if (!accept.includes('text/html')) {
+                    return;
+                }
+
+                const cacheKey = `html:${filePath}`;
+                let html: string;
+                const cached = cache.get(cacheKey);
+                const [fileStats] = await stat(filePath);
+                const mtime = fileStats?.mtimeMs ?? 0;
+                if (cached && cached.mtime === mtime) {
+                    html = cached.content;
+                    reply.header('X-Cache', 'HIT');
+                } else {
+                    // Inject env script - copy only "C_" variables
+                    const envVars: NodeJS.ProcessEnv = {};
+                    envVars.APP_NAME = Env.vars.APP_NAME;
+                    envVars.APP_VERSION = Env.vars.APP_VERSION;
+                    envVars.NODE_ENV = Env.vars.NODE_ENV;
+                    for (const key in Env.vars) {
+                        if (key.startsWith('C_')) {
+                            envVars[key] = Env.vars[key];
+                        }
+                    }
+                    const envScript = `<script>window.env = ${JSON.stringify(envVars)};</script>`;
+
+                    html = await readFile(filePath, 'utf8');
+                    const headRegex = /<head(\s*[^>]*)>/i;
+                    html = html.replace(headRegex, (match) => `${match}\n${envScript}`);
+                    console.log(`[env-inject] Injected ${Object.keys(envVars).length} env vars into ${file}`);
+                    cache.set(cacheKey, { content: html, mtime, minified: false, mimeType: 'text/html' });
+                    reply.header('X-Cache', 'MISS');
+                }
+                reply.type('text/html').send(html);
+            } catch (err) {
+                console.error(`[env-inject] Error reading ${file}:`, err);
+                return;
+            }
+        });
+    }
 }

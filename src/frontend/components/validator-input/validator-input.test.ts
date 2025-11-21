@@ -4,8 +4,8 @@
 
 import { ok, strictEqual } from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { z } from '../../shared/libs/validator';
-import { extractFieldValidators } from './validator-input';
+import { z } from '../../../shared/libs/validator';
+import { extractFieldValidators } from '.';
 
 describe('validator-input', () => {
     describe('extractFieldValidators', () => {
@@ -29,7 +29,7 @@ describe('validator-input', () => {
 
             // Email validator has a pattern (regex) for validation
             const emailDefs = validators.email.defs();
-            ok(emailDefs.pattern, 'email has pattern validation');
+            strictEqual(emailDefs.format, 'email');
 
             const _ageDefs = validators.age.defs();
             strictEqual(validators.age.isOptional, true);
@@ -55,6 +55,7 @@ describe('validator-input', () => {
             // URL validator has validation logic (no format field needed)
             const urlDefs = validators.url.defs();
             strictEqual(urlDefs.description, 'Server endpoint URL');
+            strictEqual(urlDefs.format, 'uri');
         });
 
         test('handles optional and default values', () => {
@@ -84,6 +85,42 @@ describe('validator-input', () => {
             const ageDefs = validators.age.defs();
             strictEqual(ageDefs.minimum, 0);
             strictEqual(ageDefs.maximum, 150);
+        });
+
+        test('handles enum fields (select dropdowns)', () => {
+            const schema = z.object({
+                transport: z.enum(['stdio', 'sse']),
+                status: z.enum(['active', 'inactive', 'pending']),
+            });
+
+            const validators = extractFieldValidators(schema);
+
+            const transportDefs = validators.transport.defs();
+            ok(Array.isArray(transportDefs.enum));
+            strictEqual(transportDefs.enum?.length, 2);
+            ok(transportDefs.enum?.includes('stdio'));
+            ok(transportDefs.enum?.includes('sse'));
+
+            const statusDefs = validators.status.defs();
+            strictEqual(statusDefs.enum?.length, 3);
+        });
+
+        test('handles format-based types', () => {
+            const schema = z.object({
+                email: z.string().email(),
+                website: z.string().url(),
+                birthday: z.string().isoDate(),
+                wakeTime: z.string().isoTime(),
+                appointment: z.string().isoDatetime(),
+            });
+
+            const validators = extractFieldValidators(schema);
+
+            strictEqual(validators.email.defs().format, 'email');
+            strictEqual(validators.website.defs().format, 'uri');
+            strictEqual(validators.birthday.defs().format, 'date');
+            strictEqual(validators.wakeTime.defs().format, 'time');
+            strictEqual(validators.appointment.defs().format, 'date-time');
         });
     });
 });

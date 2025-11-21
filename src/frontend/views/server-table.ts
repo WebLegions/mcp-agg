@@ -4,6 +4,8 @@
  */
 
 import type { MCPServerConfig } from '../../shared/types/mcp-config';
+import { registerDropdownMenu } from '../components/dropdown-menu';
+import { menuIcon, registerIcon } from '../components/icon';
 import type { McpConfigApp } from '../main';
 import type { JurisContext, JurisInstance, JurisVDOMElement } from '../types/juris';
 
@@ -18,7 +20,7 @@ type ServerRowProps = {
 
 export function ServerTable(props: ServerTableProps, ctx: JurisContext): JurisVDOMElement {
     const loading = ctx.getState<boolean>('servers.loading', true);
-    const error = ctx.getState<string | null>('servers.error');
+    const error = ctx.getState<string>('servers.error', '');
     const servers = ctx.getState<MCPServerConfig[]>('servers.items', []);
 
     if (loading) {
@@ -108,8 +110,6 @@ export function ServerTable(props: ServerTableProps, ctx: JurisContext): JurisVD
 
 export function ServerRow(props: ServerRowProps, ctx: JurisContext): JurisVDOMElement {
     const { server, app } = props;
-    const openMenuId = ctx.getState<string | null>('ui.openMenuId');
-    const isMenuOpen = openMenuId === server.name;
 
     let commandOrUrl = '';
     if (server.transport === 'stdio') {
@@ -122,133 +122,6 @@ export function ServerRow(props: ServerRowProps, ctx: JurisContext): JurisVDOMEl
     }
 
     const statusText = server.enabled === false ? '✗ Disabled' : '✓ Enabled';
-
-    const menuChildren: JurisVDOMElement[] = [
-        {
-            button: {
-                type: 'button',
-                text: '⋮',
-                style: 'cursor: pointer; padding: 4px 8px; font-size: 18px;',
-                onClick: (e: Event) => {
-                    e.stopPropagation();
-                    ctx.setState('ui.openMenuId', isMenuOpen ? null : server.name);
-                    setTimeout(() => app.render(), 0);
-                },
-            },
-        },
-    ];
-
-    if (isMenuOpen) {
-        menuChildren.push({
-            div: {
-                style: `
-                    position: absolute;
-                    right: 0;
-                    top: 100%;
-                    background: var(--bg, #fff);
-                    border: 1px solid var(--border, #ccc);
-                    border-radius: 4px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                    padding: 4px;
-                    z-index: 100;
-                    min-width: 140px;
-                `,
-                children: [
-                    {
-                        button: {
-                            type: 'button',
-                            text: server.enabled === false ? '✓ Enable' : '✕ Disable',
-                            style: `
-                                display: block;
-                                width: 100%;
-                                text-align: left;
-                                padding: 8px 12px;
-                                border: none;
-                                background: transparent;
-                                cursor: pointer;
-                            `,
-                            onMouseOver: (e: Event) => {
-                                (e.target as HTMLElement).style.background = 'var(--hover-bg, #f0f0f0)';
-                            },
-                            onMouseOut: (e: Event) => {
-                                (e.target as HTMLElement).style.background = 'transparent';
-                            },
-                            onClick: async (e: Event) => {
-                                e.stopPropagation();
-                                ctx.setState('ui.openMenuId', null);
-                                await app.enableServer(server.name, server.enabled !== false);
-                            },
-                        },
-                    },
-                    {
-                        button: {
-                            type: 'button',
-                            text: '✎ Edit',
-                            style: `
-                                display: block;
-                                width: 100%;
-                                text-align: left;
-                                padding: 8px 12px;
-                                border: none;
-                                background: transparent;
-                                cursor: pointer;
-                            `,
-                            onMouseOver: (e: Event) => {
-                                (e.target as HTMLElement).style.background = 'var(--hover-bg, #f0f0f0)';
-                            },
-                            onMouseOut: (e: Event) => {
-                                (e.target as HTMLElement).style.background = 'transparent';
-                            },
-                            onClick: (e: Event) => {
-                                e.stopPropagation();
-                                ctx.setState('ui.serverModalMode', 'edit');
-                                ctx.setState('ui.showServerModal', true);
-                                ctx.setState('ui.openMenuId', null);
-                                ctx.setState('serverModal.name', server.name);
-                                ctx.setState('serverModal.transport', server.transport);
-                                ctx.setState('serverModal.command', server.transport === 'stdio' ? server.command : '');
-                                ctx.setState('serverModal.url', server.transport !== 'stdio' ? server.url : '');
-                                ctx.setState(
-                                    'serverModal.args',
-                                    server.transport === 'stdio' && Array.isArray(server.args) ? server.args.join(' ') : '',
-                                );
-                                ctx.setState('serverModal.enabled', server.enabled !== false);
-                                ctx.setState('serverModal.description', server.description || '');
-                                setTimeout(() => app.render(), 0);
-                            },
-                        },
-                    },
-                    {
-                        button: {
-                            type: 'button',
-                            text: '🗑 Delete',
-                            style: `
-                                display: block;
-                                width: 100%;
-                                text-align: left;
-                                padding: 8px 12px;
-                                border: none;
-                                background: transparent;
-                                cursor: pointer;
-                                color: var(--danger, #d32f2f);
-                            `,
-                            onMouseOver: (e: Event) => {
-                                (e.target as HTMLElement).style.background = 'var(--hover-bg, #f0f0f0)';
-                            },
-                            onMouseOut: (e: Event) => {
-                                (e.target as HTMLElement).style.background = 'transparent';
-                            },
-                            onClick: async (e: Event) => {
-                                e.stopPropagation();
-                                ctx.setState('ui.openMenuId', null);
-                                await app.deleteServer(server.name);
-                            },
-                        },
-                    },
-                ],
-            },
-        });
-    }
 
     return {
         tr: {
@@ -293,8 +166,121 @@ export function ServerRow(props: ServerRowProps, ctx: JurisContext): JurisVDOMEl
                 },
                 {
                     td: {
-                        style: 'position: relative;',
-                        children: menuChildren,
+                        children: [
+                            {
+                                DropdownMenu: {
+                                    id: `server-actions-${server.name}`,
+                                    align: 'end',
+                                    trigger: {
+                                        Icon: {
+                                            svg: menuIcon,
+                                            ariaLabel: 'Server actions',
+                                            title: 'Server actions',
+                                        },
+                                    },
+                                    children: [
+                                        {
+                                            DropdownMenuItem: {
+                                                text: 'Edit',
+                                                onClick: () => {
+                                                    ctx.setState('ui.serverModalMode', 'edit');
+                                                    ctx.setState('ui.showServerModal', true);
+                                                    ctx.setState('serverModal.name.value', server.name);
+                                                    ctx.setState('serverModal.name.error', '');
+                                                    ctx.setState('serverModal.transport.value', server.transport);
+                                                    ctx.setState('serverModal.transport.error', '');
+                                                    ctx.setState(
+                                                        'serverModal.command.value',
+                                                        server.transport === 'stdio' ? server.command : '',
+                                                    );
+                                                    ctx.setState('serverModal.command.error', '');
+                                                    ctx.setState(
+                                                        'serverModal.url.value',
+                                                        server.transport !== 'stdio' ? server.url : '',
+                                                    );
+                                                    ctx.setState('serverModal.url.error', '');
+                                                    ctx.setState(
+                                                        'serverModal.args.value',
+                                                        server.transport === 'stdio' && Array.isArray(server.args)
+                                                            ? server.args.join(' ')
+                                                            : '',
+                                                    );
+                                                    ctx.setState('serverModal.args.error', '');
+                                                    ctx.setState('serverModal.enabled.value', server.enabled !== false);
+                                                    ctx.setState('serverModal.enabled.error', '');
+                                                    ctx.setState('serverModal.description.value', server.description || '');
+                                                    ctx.setState('serverModal.description.error', '');
+                                                    ctx.setState('serverModal.validated', false);
+                                                    app.render();
+                                                },
+                                            },
+                                        },
+                                        {
+                                            DropdownMenuItem: {
+                                                text: 'Duplicate',
+                                                onClick: () => {
+                                                    ctx.setState('ui.serverModalMode', 'add');
+                                                    ctx.setState('ui.showServerModal', true);
+                                                    ctx.setState('serverModal.name.value', `${server.name}-copy`);
+                                                    ctx.setState('serverModal.name.error', '');
+                                                    ctx.setState('serverModal.transport.value', server.transport);
+                                                    ctx.setState('serverModal.transport.error', '');
+                                                    ctx.setState(
+                                                        'serverModal.command.value',
+                                                        server.transport === 'stdio' ? server.command : '',
+                                                    );
+                                                    ctx.setState('serverModal.command.error', '');
+                                                    ctx.setState(
+                                                        'serverModal.url.value',
+                                                        server.transport !== 'stdio' ? server.url : '',
+                                                    );
+                                                    ctx.setState('serverModal.url.error', '');
+                                                    ctx.setState(
+                                                        'serverModal.args.value',
+                                                        server.transport === 'stdio' && Array.isArray(server.args)
+                                                            ? server.args.join(' ')
+                                                            : '',
+                                                    );
+                                                    ctx.setState('serverModal.args.error', '');
+                                                    ctx.setState('serverModal.enabled.value', server.enabled !== false);
+                                                    ctx.setState('serverModal.enabled.error', '');
+                                                    ctx.setState('serverModal.description.value', server.description || '');
+                                                    ctx.setState('serverModal.description.error', '');
+                                                    ctx.setState('serverModal.validated', false);
+                                                    app.render();
+                                                },
+                                            },
+                                        },
+                                        {
+                                            DropdownMenuSeparator: {},
+                                        },
+                                        {
+                                            DropdownMenuItem: {
+                                                text: server.enabled === false ? 'Enable' : 'Disable',
+                                                onClick: async () => {
+                                                    await app.enableServer(server.name, server.enabled !== false);
+                                                    ctx.setState('servers.menuId', '');
+                                                },
+                                            },
+                                        },
+                                        {
+                                            DropdownMenuSeparator: {},
+                                        },
+                                        {
+                                            DropdownMenuItem: {
+                                                text: 'Delete',
+                                                onClick: async () => {
+                                                    if (confirm(`Are you sure you want to delete "${server.name}"?`)) {
+                                                        await app.deleteServer(server.name);
+                                                        ctx.setState('servers.menuId', '');
+                                                    }
+                                                },
+                                            },
+                                        },
+                                    ],
+                                },
+                            },
+                        ],
                     },
                 },
             ],
@@ -306,6 +292,8 @@ export function ServerRow(props: ServerRowProps, ctx: JurisContext): JurisVDOMEl
  * Register ServerTable and ServerRow components with Juris
  */
 export function registerServerTable(juris: JurisInstance, app: McpConfigApp) {
+    registerDropdownMenu(juris);
+    registerIcon(juris);
     juris.registerComponent('ServerTable', (props, ctx) => ServerTable({ ...props, app }, ctx));
     juris.registerComponent('ServerRow', (props, ctx) => ServerRow({ ...(props as { server: MCPServerConfig }), app }, ctx));
 }

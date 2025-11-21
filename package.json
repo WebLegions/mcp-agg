@@ -13,7 +13,7 @@
     "clean": "bun script/rimraf.ts -- -q var dist build build-logs coverage node_modules .cache NUL *.log *.cpuprofile",
     "cluster": "bun src/cluster.ts",
     "dev": "bun --hot src/app.ts",
-    "kill": "taskkill /F /IM bun.exe",
+    "kill": "bun script/kill.ts",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "mcp": "bun src/cli/index.ts mcp",

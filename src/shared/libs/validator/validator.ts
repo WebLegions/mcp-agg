@@ -1263,8 +1263,7 @@ export class ObjV<S extends Record<string, Validator>> extends TypeV<InferObject
         return this;
     }
 
-    // biome-ignore lint/suspicious/noExplicitAny: merged schema type cannot be statically inferred
-    extend(additionalSchema: Record<string, Validator>): ObjV<any> {
+    extend<Ext extends Record<string, Validator>>(additionalSchema: Ext): ObjV<S & Ext> {
         const merged = { ...this._schema, ...additionalSchema };
         const extended = new ObjV(merged);
 
@@ -1281,9 +1280,7 @@ export class ObjV<S extends Record<string, Validator>> extends TypeV<InferObject
             extended._checks.push(this._checks[i] as never);
         }
 
-        // Preserve metadata (defs)
         extended._defs = { ...this._defs };
-
         return extended;
     }
 
@@ -1580,8 +1577,19 @@ class UnionV<T> extends TypeV<T> {
 
 // --- Enum Validator is a Union of literals --
 class EnumV<T> extends UnionV<T> {
+    private _values: readonly (string | number | boolean)[];
+
     constructor(values: readonly (string | number | boolean)[]) {
         super(values.map((v) => literal(v)));
+        this._values = values;
+    }
+
+    override defs(props = false): ValidatorDef {
+        const baseDef = super.defs(props);
+        return {
+            ...baseDef,
+            enum: this._values as unknown[],
+        };
     }
 }
 

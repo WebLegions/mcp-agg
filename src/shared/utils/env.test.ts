@@ -98,4 +98,11 @@ describe('env', (t) => {
         deepEqual(result3.foo, 0);
         deepEqual(result3.bar, '');
     });
+
+    test('get all Env vars', () => {
+        const allVars = Env.vars;
+        ok(typeof allVars === 'object');
+        ok(Object.keys(allVars).length > 0);
+        //deepEqual(allVars.NODE_ENV, 'test');
+    });
 });

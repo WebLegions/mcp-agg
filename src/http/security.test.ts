@@ -18,10 +18,11 @@ describe('HTTP Security Middleware', () => {
         // Create and start server
         app = createServer();
         await registerRoutes(app);
-        // Use PORT from env (set by test runner) or default to 3000
-        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
-        await app.listen({ port, host: '127.0.0.1' });
-        baseUrl = `http://localhost:${port}`;
+        // Use port 0 to get a random available port
+        await app.listen({ port: 0, host: '127.0.0.1' });
+        const addr = app.server.address();
+        const port = typeof addr === 'object' && addr ? addr.port : 0;
+        baseUrl = `http://127.0.0.1:${port}`;
     });
 
     afterEach(async () => {
@@ -177,12 +178,12 @@ describe('HTTP Security Middleware', () => {
         await app.close();
         app = createServer();
         await registerRoutes(app);
-        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
-        await app.listen({ port, host: '127.0.0.1' });
-        const testPort = port;
+        await app.listen({ port: 0, host: '127.0.0.1' });
+        const addr = app.server.address();
+        const port = typeof addr === 'object' && addr ? addr.port : 0;
 
         // Request with malicious Host header
-        const response = await fetch(`http://127.0.0.1:${testPort}/health`, {
+        const response = await fetch(`http://127.0.0.1:${port}/health`, {
             headers: {
                 Host: 'evil.com',
             },
@@ -204,8 +205,9 @@ describe('HTTP Security Middleware', () => {
         await app.close();
         app = createServer();
         await registerRoutes(app);
-        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
-        await app.listen({ port, host: '127.0.0.1' });
+        await app.listen({ port: 0, host: '127.0.0.1' });
+        const addr = app.server.address();
+        const port = typeof addr === 'object' && addr ? addr.port : 0;
 
         // Request with allowed Host header
         const response = await fetch(`http://127.0.0.1:${port}/health`, {
@@ -225,8 +227,9 @@ describe('HTTP Security Middleware', () => {
         await app.close();
         app = createServer();
         await registerRoutes(app);
-        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
-        await app.listen({ port, host: '127.0.0.1' });
+        await app.listen({ port: 0, host: '127.0.0.1' });
+        const addr = app.server.address();
+        const port = typeof addr === 'object' && addr ? addr.port : 0;
 
         // Request with any Host header should be allowed when protection is disabled
         const response = await fetch(`http://127.0.0.1:${port}/health`, {
@@ -246,8 +249,9 @@ describe('HTTP Security Middleware', () => {
         await app.close();
         app = createServer();
         await registerRoutes(app);
-        const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
-        await app.listen({ port, host: '127.0.0.1' });
+        await app.listen({ port: 0, host: '127.0.0.1' });
+        const addr = app.server.address();
+        const port = typeof addr === 'object' && addr ? addr.port : 0;
 
         // Test each allowed host
         for (const host of ['localhost', '127.0.0.1', 'example.local']) {

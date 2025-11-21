@@ -8,8 +8,9 @@ import { z } from '../shared/libs/validator';
 import type { MCPServerConfig } from '../shared/types/mcp-config';
 import { mcpServerConfigSchema } from '../shared/types/mcp-config';
 import { Env } from '../shared/utils/env';
-import { registerThemeSwitch } from './components/theme-switch/component';
-import { initialState, type StateKey } from './state';
+import { registerModal } from './components/modal';
+import { registerThemeSwitch } from './components/theme-switch';
+import { initialState } from './state';
 import type { JurisConstructor, JurisInstance } from './types/juris';
 import { registerAppShell } from './views/app-shell';
 import { registerMcpConfigPage } from './views/mcp-config-page';
@@ -19,14 +20,7 @@ import { registerServerTable } from './views/server-table';
 // biome-ignore lint/style/useNamingConvention: Juris is an external library global
 declare const Juris: JurisConstructor;
 
-// Extend Window interface to include our app
-declare global {
-    interface Window {
-        mcpApp: McpConfigApp;
-    }
-}
-
-class McpConfigApp {
+export class McpConfigApp {
     private _api: ApiClient;
     public juris!: JurisInstance;
 
@@ -61,79 +55,76 @@ class McpConfigApp {
             layout: {
                 AppShell: {},
             },
+            // Enable CSS extraction for component-based CSS isolation
+            features: {
+                cssExtractor: CSSExtractor, // Enable CSS extraction
+            }
         });
 
         // Register all components - centralized registration
-        registerThemeSwitch(this.juris);
         registerAppShell(this.juris, this);
+        registerModal(this.juris);
         registerMcpConfigPage(this.juris, this);
         registerServerTable(this.juris, this);
         registerServerModal(this.juris, this);
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', () => {
-            const openMenuId = this.juris.getState<string | null>('ui.openMenuId');
-            if (openMenuId) {
-                this.juris.setState('ui.openMenuId', null);
-                this.juris.render('#app');
-            }
-        });
+        registerThemeSwitch(this.juris);
     }
 
     async loadServers(): Promise<void> {
         try {
-            this.setState('servers.loading', true);
-            this.setState('servers.error', null);
+            this.juris.setState('servers.loading', true);
+            this.juris.setState('servers.error', '');
             this.render();
 
             const data = await this._api.fetch<{ servers: MCPServerConfig[] }>('config');
-            this.setState('servers.items', data.servers || []);
-            this.setState('servers.loading', false);
+            this.juris.setState('servers.items', data.servers || []);
+            this.juris.setState('servers.loading', false);
             this.render();
         } catch (error) {
             console.error('Failed to load servers:', error);
-            this.setState('servers.error', (error as Error).message);
-            this.setState('servers.loading', false);
+            this.juris.setState('servers.error', (error as Error).message);
+            this.juris.setState('servers.loading', false);
             this.render();
         }
     }
 
     async saveServer(): Promise<void> {
-        const modalMode = this.getState<string>('ui.serverModalMode');
+        const modalMode = this.juris.getState<string>('ui.serverModalMode');
 
         // Load data directly from state - build MCPServerConfig structure
-        const name = (this.getState<string>('serverModal.name') || '').trim();
-        const transport = this.getState<string>('serverModal.transport') || 'stdio';
-        const command = (this.getState<string>('serverModal.command') || '').trim();
-        const url = (this.getState<string>('serverModal.url') || '').trim();
-        const argsStr = (this.getState<string>('serverModal.args') || '').trim();
-        const description = (this.getState<string>('serverModal.description') || '').trim();
-        const enabled = this.getState<boolean>('serverModal.enabled', true);
+        const name = (this.juris.getState<string>('serverModal.name.value') || '').trim();
+        const transport = this.juris.getState<string>('serverModal.transport.value') || 'stdio';
+        const command = (this.juris.getState<string>('serverModal.command.value') || '').trim();
+        const url = (this.juris.getState<string>('serverModal.url.value') || '').trim();
+        const argsStr = (this.juris.getState<string>('serverModal.args.value') || '').trim();
+        const description = (this.juris.getState<string>('serverModal.description.value') || '').trim();
+        const enabled = this.juris.getState<boolean>('serverModal.enabled.value', true);
 
         // Build config object based on transport type
         const serverConfig: unknown =
             transport === 'stdio'
                 ? {
-                      name,
-                      transport: 'stdio',
-                      command,
-                      args: argsStr ? argsStr.split(/\s+/).filter((a) => a.length > 0) : undefined,
-                      enabled,
-                      description: description || undefined,
-                  }
+                    name,
+                    transport: 'stdio',
+                    command,
+                    args: argsStr ? argsStr.split(/\s+/).filter((a) => a.length > 0) : undefined,
+                    enabled,
+                    description: description || undefined,
+                }
                 : {
-                      name,
-                      transport,
-                      url,
-                      enabled,
-                      description: description || undefined,
-                  };
+                    name,
+                    transport,
+                    url,
+                    enabled,
+                    description: description || undefined,
+                };
 
         // Validate using MCPServerConfigSchema
         const result = z.safeParse(mcpServerConfigSchema, serverConfig);
 
         if (!result.success) {
-            alert(`Validation failed:\n${result.error.message}`);
+            console.error('Validation failed:', result.error.message);
+            // Validation errors should already be shown inline in the form
             return;
         }
 
@@ -152,11 +143,12 @@ class McpConfigApp {
                 });
             }
 
-            this.setState('ui.showServerModal', false);
+            // Close modal on success
+            this.juris.setState('ui.showServerModal', false);
             await this.loadServers();
         } catch (error) {
             console.error('Failed to save server:', error);
-            alert(`Failed to save server: ${(error as Error).message}`);
+            // Keep modal open and log error - user can see in console
         }
     }
 
@@ -190,16 +182,6 @@ class McpConfigApp {
     render(): void {
         this.juris.render('#app');
     }
-
-    /** Type-safe setState wrapper */
-    setState(key: StateKey, value: unknown): void {
-        this.juris.setState(key, value);
-    }
-
-    /** Type-safe getState wrapper */
-    getState<T>(key: StateKey, defaultValue?: T): T {
-        return this.juris.getState(key, defaultValue);
-    }
 }
 
 // Initialize the app when the page loads
@@ -208,5 +190,3 @@ if (typeof window !== 'undefined') {
         window.mcpApp = new McpConfigApp();
     });
 }
-
-export { McpConfigApp };

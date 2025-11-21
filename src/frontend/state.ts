@@ -8,29 +8,31 @@
  * All state keys must be defined here for compile-time validation
  */
 export type StateKey =
-    // Server data
+    // UI state
+    | 'ui.showServerModal'
+    | 'ui.serverModalMode'
+    | 'ui.showEnvInfoModal'
+    // Server table
     | 'servers.items'
     | 'servers.loading'
     | 'servers.error'
-    // UI state
-    | 'ui.openMenuId'
-    | 'ui.showServerModal'
-    | 'ui.serverModalMode'
+    | 'servers.menuId'
     // Server modal form fields
-    | 'serverModal.name'
-    | 'serverModal.transport'
-    | 'serverModal.command'
-    | 'serverModal.url'
-    | 'serverModal.args'
-    | 'serverModal.enabled'
-    | 'serverModal.description'
-    // Server modal validation errors
+    | 'serverModal.name.value'
     | 'serverModal.name.error'
+    | 'serverModal.transport.value'
     | 'serverModal.transport.error'
+    | 'serverModal.command.value'
     | 'serverModal.command.error'
+    | 'serverModal.url.value'
     | 'serverModal.url.error'
+    | 'serverModal.args.value'
     | 'serverModal.args.error'
-    | 'serverModal.description.error';
+    | 'serverModal.enabled.value'
+    | 'serverModal.enabled.error'
+    | 'serverModal.description.value'
+    | 'serverModal.description.error'
+    | 'serverModal.validated';
 
 /**
  * Initial application state structure
@@ -40,22 +42,22 @@ export const initialState = {
     servers: {
         items: [],
         loading: true,
-        error: null,
+        error: '',
+        menuId: '',
     },
     ui: {
-        openMenuId: null,
         showServerModal: false,
         serverModalMode: 'create',
+        showEnvInfoModal: false,
     },
     serverModal: {
-        name: '',
-        transport: 'stdio',
-        command: '',
-        url: '',
-        args: '',
-        enabled: true,
-        description: '',
-        // Nested error object
-        error: {},
+        name: { value: '', error: '' },
+        transport: { value: 'stdio', error: '' },
+        command: { value: '', error: '' },
+        url: { value: '', error: '' },
+        args: { value: '', error: '' },
+        enabled: { value: true, error: '' },
+        description: { value: '', error: '' },
+        validated: false,
     },
-} as const;
+};

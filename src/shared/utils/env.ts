@@ -52,6 +52,7 @@ export class Env {
         typeof Object(globalThis).window !== 'undefined' &&
         typeof Object(globalThis).document !== 'undefined' &&
         typeof Object(globalThis).document.querySelector === 'function';
+    static isDevelopment = process.env.NODE_ENV === 'development';
 
     /**
      * Server-side initialization helper method.
@@ -163,7 +164,6 @@ export class Env {
 
         env.NODE_ENV ??= 'development';
         Env.nodeEnv = env.NODE_ENV;
-        env.LOG_LEVEL ??= 'INFO';
 
         // Client-side initialization (browser)
         if (!isServer) {
@@ -183,21 +183,21 @@ export class Env {
             typeof Object(globalThis).document !== 'undefined' &&
             typeof Object(globalThis).document.querySelector === 'function';
 
-        Env._out = `
------------------
-app: ${Env.appName}, version: ${Env.appVersion},
-host: ${Env.hostname}, ${Env.runtime}: ${Env.runtimeVer},
-NODE_ENV: ${Env.nodeEnv}, uv_threads: ${Env.uvThreadpool}
-${
-    isServer &&
-    `
+        const serverInfo = isServer
+            ? `, uv_threads: ${Env.uvThreadpool}
 cwd: ${process.cwd()}, dirname: ${Env.__dirname},
 namespace: ${Env.podNamespace || '-'}, pod: ${Env.podName || '-'},
 pid: ${process.pid}, workerId: ${Env.workerId || '-'}, threadId: ${Env.threadId || '-'},
 euid: ${process.geteuid?.() ?? '-'} egid: ${process.getegid?.() ?? '-'},
 args: "${process.execArgv.join(' ')}",
 logLevel: ${env.LOG_LEVEL}, isDebugging: ${isDebugging()}, test: ${process.env.NODE_TEST_CONTEXT}`
-}
+            : '';
+
+        Env._out = `
+-----------------
+app: ${Env.appName}, version: ${Env.appVersion},
+host: ${Env.hostname}, ${Env.runtime}: ${Env.runtimeVer},
+NODE_ENV: ${Env.nodeEnv}${serverInfo}
 -----------------
 `;
         return Env;
@@ -267,8 +267,12 @@ logLevel: ${env.LOG_LEVEL}, isDebugging: ${isDebugging()}, test: ${process.env.N
         else console.info(Env._out);
     }
 
+    static get vars() {
+        return (typeof process !== 'undefined' ? process.env : Object(window).env) ?? {};
+    }
+
     // just to keep the linter happy
-    private constructor() {}
+    private constructor() { }
 }
 
 // Initialize at module load

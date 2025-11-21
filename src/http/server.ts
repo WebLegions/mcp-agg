@@ -13,7 +13,7 @@ import { registerMCP } from './mcp';
 import { registerSecurityPlugins } from './security';
 import { registerStatic } from './static';
 import { registerSwagger } from './swagger';
-import { registerTranspile } from './transpile';
+import { registerEnvInject, registerTranspile } from './transpile';
 import { type Provider, schemaCompiler, serializerCompiler } from './type-provider';
 
 /**
@@ -132,6 +132,10 @@ export async function registerRoutes(app: FastifyInstance) {
     // Error handlers for nice-looing error page
     registerErrorHandler(app);
 
+    // Inject env vars into HTML files
+    const publicDir = join(__dirname, '..', 'public');
+    await registerEnvInject(app, ['index.html', 'mcp-config.html'], publicDir);
+
     // Static file serving (must be last to avoid route conflicts)
     await registerStatic(app, '../public', '/');
 }
@@ -139,7 +143,7 @@ export async function registerRoutes(app: FastifyInstance) {
 /**
  * Start HTTP server
  */
-export async function startServer(app: ReturnType<typeof createServer>) {
+export async function startServer(app: FastifyInstance) {
     const port = Number.parseInt(process.env.PORT ?? '3000', 10);
     const host = process.env.HOST ?? '0.0.0.0';
 

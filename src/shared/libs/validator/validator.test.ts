@@ -1205,7 +1205,7 @@ test('should extend object with passthrough mode preserved', () => {
     const baseSchema = object({ name: string() }).passthrough();
     const extended = baseSchema.extend({ age: number() });
 
-    const result = extended.parse({ name: 'John', age: 30, extra: 'value' });
+    const result = extended.parse({ name: 'John', age: 30, extra: 'value' }) as { name: string; age: number; extra: string };
     strictEqual(result.name, 'John');
     strictEqual(result.age, 30);
     strictEqual(result.extra, 'value');

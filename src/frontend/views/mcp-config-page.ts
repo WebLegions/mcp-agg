@@ -12,6 +12,7 @@ type McpConfigPageProps = {
 };
 
 export function McpConfigPage(props: McpConfigPageProps, ctx: JurisContext): JurisVDOMElement {
+    const { app } = props;
     return {
         div: {
             children: [
@@ -56,14 +57,22 @@ export function McpConfigPage(props: McpConfigPageProps, ctx: JurisContext): Jur
                                                                 onClick: () => {
                                                                     ctx.setState('ui.serverModalMode', 'create');
                                                                     ctx.setState('ui.showServerModal', true);
-                                                                    ctx.setState('serverModal.name', '');
-                                                                    ctx.setState('serverModal.transport', 'stdio');
-                                                                    ctx.setState('serverModal.command', '');
-                                                                    ctx.setState('serverModal.url', '');
-                                                                    ctx.setState('serverModal.args', '');
-                                                                    ctx.setState('serverModal.enabled', true);
-                                                                    ctx.setState('serverModal.description', '');
-                                                                    setTimeout(() => props.app.render(), 0);
+                                                                    ctx.setState('serverModal.name.value', '');
+                                                                    ctx.setState('serverModal.name.error', '');
+                                                                    ctx.setState('serverModal.transport.value', 'stdio');
+                                                                    ctx.setState('serverModal.transport.error', '');
+                                                                    ctx.setState('serverModal.command.value', '');
+                                                                    ctx.setState('serverModal.command.error', '');
+                                                                    ctx.setState('serverModal.url.value', '');
+                                                                    ctx.setState('serverModal.url.error', '');
+                                                                    ctx.setState('serverModal.args.value', '');
+                                                                    ctx.setState('serverModal.args.error', '');
+                                                                    ctx.setState('serverModal.enabled.value', true);
+                                                                    ctx.setState('serverModal.enabled.error', '');
+                                                                    ctx.setState('serverModal.description.value', '');
+                                                                    ctx.setState('serverModal.description.error', '');
+                                                                    ctx.setState('serverModal.validated', false);
+                                                                    app.render();
                                                                 },
                                                             },
                                                         },
