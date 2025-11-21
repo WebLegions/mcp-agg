@@ -83,32 +83,31 @@ export function Modal(props: ModalProps, ctx: JurisContext): JurisVDOMElement {
         : children || [];
 
     // CSSExtractor Styles
-    const styles: ExtendedStyleObject = {
+    const style: ExtendedStyleObject = {
         // Modal backdrop - fixed overlay
         position: 'fixed',
         top: '0',
         left: '0',
         right: '0',
         bottom: '0',
-        background: 'color-mix(in srgb, var(--body-bg, black) 70%, transparent)',
+        background: 'color-mix(in srgb, var(--body-bg) 70%, transparent)',
         backdropFilter: 'blur(2px)',
         display: () => (ctx.getState(stateKey) ? 'flex' : 'none'),
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: zIndex,
-        padding: '1rem',
+        zIndex,
+        padding: 'var(--spacing-base)',
 
         // Child selectors for the dialog
         '& .dialog': {
-            background: 'var(--card-bg, white)',
+            background: 'var(--card-bg)',
             maxWidth: '90vw',
             maxHeight: '90vh',
             width: '100%',
             padding: '0',
-            border: '1px solid var(--border-color, rgba(128, 128, 128, 0.3))',
-            borderRadius: '8px',
-            boxShadow: `0 4px 6px color-mix(in srgb, var(--body-bg, black) 10%, transparent),
-                        0 10px 20px color-mix(in srgb, var(--body-bg, black) 15%, transparent)`,
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--border-radius-lg)',
+            boxShadow: 'var(--shadow-md)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -125,73 +124,67 @@ export function Modal(props: ModalProps, ctx: JurisContext): JurisVDOMElement {
             border: 'none',
         },
 
-        // Header with title and close button - matches table header style
+        // Header with title and close button - matches table header style (thead/th)
         '& .dialog header': {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: 'calc(var(--spacing-base, 1rem) * 0.75) 1.5rem',
-            borderBottom: '1px solid var(--border-color, rgba(128, 128, 128, 0.2))',
-            background: 'var(--gradient-secondary, linear-gradient(135deg, var(--secondary, #6366f1) 0%, var(--secondary-light, #818cf8) 100%))',
-            color: '#fff',
+            // Matches th,td padding
+            padding: 'calc(var(--spacing-base) * 0.75) var(--spacing-base)',
+            borderBottom: '1px solid var(--border-color)',
+            // Matches thead background
+            background: 'var(--gradient-secondary)',
         },
 
         '& .dialog header h2, & .dialog header h3': {
             margin: '0',
+            // Matches th text styles exactly
             fontSize: '0.875rem',
-            fontWeight: 'var(--font-weight-bold, 700)',
+            fontWeight: 'var(--font-weight-bold)',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
-            color: '#fff',
+            color: 'white', // Matches classless.css th: color: white
         },
 
-        // Close icon in header - override to white for dark gradient background
-        '& .dialog header .icon-container': {
-            '--icon-color': '#fff',
-        },
-
-        '& .dialog header .icon-container svg': {
-            color: '#fff',
-        },
-
+        // Close icon in header - white to match th text on gradient background
         '& .dialog header .icon-container .icon-bg': {
             fill: 'transparent',
-            stroke: '#fff',
+            stroke: 'white',
             strokeWidth: '1px',
         },
 
         '& .dialog header .icon-container .icon-text': {
-            fill: '#fff',
+            fill: 'white',
         },
 
         '& .dialog header .icon-container:hover .icon-bg': {
-            fill: 'rgba(255, 255, 255, 0.1)',
+            fill: 'color-mix(in srgb, white 10%, transparent)',
         },
 
         // Modal body - scrollable content
         '& .dialog .body': {
             flex: '1',
-            padding: '1.5rem',
+            padding: 'var(--spacing-base)',
             overflowY: 'auto',
-            background: 'var(--card-bg, white)',
-            color: 'var(--body-color, #1e293b)',
+            background: 'var(--card-bg)',
+            color: 'var(--body-color)',
         },
 
         // Modal footer with action buttons
         '& .dialog footer.footer': {
             display: 'flex',
-            gap: '0.75rem',
+            gap: 'calc(var(--spacing-base) * 0.75)',
             justifyContent: 'flex-end',
-            padding: '1rem 1.5rem',
-            borderTop: '1px solid var(--border-color, rgba(128, 128, 128, 0.2))',
-            background: 'var(--card-bg, white)',
+            padding: 'var(--spacing-base)',
+            borderTop: '1px solid var(--border-color)',
+            background: 'var(--card-bg)',
         },
 
         // Form inside modal
         '& .dialog form': {
             display: 'flex',
             flexDirection: 'column',
-            gap: '1rem',
+            gap: 'var(--spacing-base)',
         },
 
         // Responsive sizing
@@ -207,7 +200,7 @@ export function Modal(props: ModalProps, ctx: JurisContext): JurisVDOMElement {
         div: {
             id,
             className: 'backdrop',
-            style: styles,
+            style,
             onClick: (e: Event) => {
                 // Close modal when clicking backdrop (outside dialog)
                 if (e.target === e.currentTarget) {

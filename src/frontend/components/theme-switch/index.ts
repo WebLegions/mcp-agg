@@ -49,8 +49,6 @@ function toggleTheme(): 'dark' | 'light' {
     return newTheme;
 }
 
-
-
 /**
  * Theme Switch Component
  */
@@ -72,9 +70,9 @@ export function ThemeSwitch(_props: Record<string, never>, _ctx: JurisContext): 
         lineHeight: '0',
 
         // Use CSS variables from classless theme - automatically adapts to theme changes
-        '--bg': 'var(--card-bg, #ffffff)',
-        '--fg': 'var(--body-color, #1e293b)',
-        '--border': 'var(--border-color, rgba(128, 128, 128, 0.3))',
+        '--bg': 'var(--card-bg)',
+        '--fg': 'var(--body-color)',
+        '--border': 'var(--border-color)',
 
         // Child selectors
         '& .theme-switch-button': {
@@ -108,7 +106,7 @@ export function ThemeSwitch(_props: Record<string, never>, _ctx: JurisContext): 
             width: '100%',
             background: 'var(--border)',
             margin: '0 1px',
-            borderRadius: '12px',
+            borderRadius: 'var(--border-radius-full)',
         },
 
         '& .thumb': {
@@ -122,7 +120,7 @@ export function ThemeSwitch(_props: Record<string, never>, _ctx: JurisContext): 
             alignItems: 'center',
             justifyContent: 'center',
             background: 'var(--bg)',
-            transition: 'transform 0.3s ease-in-out, filter 0.2s',
+            transition: 'var(--transition-base)',
             cursor: 'pointer',
         },
 
@@ -141,22 +139,22 @@ export function ThemeSwitch(_props: Record<string, never>, _ctx: JurisContext): 
             overflow: 'visible',
         },
 
-        // Sun rays - visible in light mode
+        // Sun rays
         '& .sun-ray': {
-            transition: 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out',
+            transition: 'var(--transition-base)',
             transformOrigin: 'center',
             opacity: 1,
         },
 
         // Moon path - hidden in light mode
         '& .moon': {
-            transition: 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out',
+            transition: 'var(--transition-base)',
             opacity: 0,
             transform: 'scale(0)',
             transformOrigin: 'center',
         },
 
-        // Dark mode styles via aria-pressed - hide sun rays, show moon
+        // Dark mode styles - hide sun rays, show moon
         '& .theme-switch-button[aria-pressed="true"] .sun-ray': {
             opacity: 0,
             transform: 'scale(0)',
@@ -165,28 +163,6 @@ export function ThemeSwitch(_props: Record<string, never>, _ctx: JurisContext): 
         '& .theme-switch-button[aria-pressed="true"] .moon': {
             opacity: 1,
             transform: 'scale(1)',
-        },
-
-        // Dark mode styles via HTML attribute - for initial state and external changes
-        'html[color-scheme="dark"] & .sun-ray': {
-            opacity: 0,
-            transform: 'scale(0)',
-        },
-
-        'html[color-scheme="dark"] & .moon': {
-            opacity: 1,
-            transform: 'scale(1)',
-        },
-
-        // Light mode styles via HTML attribute
-        'html[color-scheme="light"] & .sun-ray': {
-            opacity: 1,
-            transform: 'scale(1)',
-        },
-
-        'html[color-scheme="light"] & .moon': {
-            opacity: 0,
-            transform: 'scale(0)',
         },
     };
 

@@ -246,17 +246,15 @@ describe('ThemeSwitch Component', () => {
             assert.ok(typeof vdom.div.oncreate === 'function');
         });
 
-        test('should use html[color-scheme] selectors for icon visibility', () => {
+        test('should use aria-pressed attribute for icon visibility', () => {
             // biome-ignore lint/suspicious/noExplicitAny: VDOM element type is complex union
             const vdom = ThemeSwitch({}, mockContext) as any;
 
             const style = vdom.div.style;
 
-            // Check that html[color-scheme="dark"] selectors exist for sun/moon icons
-            assert.ok(style['html[color-scheme="dark"] & .sun-ray']);
-            assert.ok(style['html[color-scheme="dark"] & .moon']);
-            assert.ok(style['html[color-scheme="light"] & .sun-ray']);
-            assert.ok(style['html[color-scheme="light"] & .moon']);
+            // Check that aria-pressed selectors exist for sun/moon icons
+            assert.ok(style['& .theme-switch-button[aria-pressed="true"] .sun-ray']);
+            assert.ok(style['& .theme-switch-button[aria-pressed="true"] .moon']);
         });
     });
 });
