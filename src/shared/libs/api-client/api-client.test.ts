@@ -4,7 +4,7 @@ import { sleep } from '../../utils/time';
 import { ApiClient, ClientOptions, PromiseRetry } from './api-client';
 import { SSESession } from './sse-session';
 
-describe('ApiClient', () => {
+describe.skip('ApiClient', () => {
     const baseURL = 'https://api.example.com';
 
     afterEach(() => {

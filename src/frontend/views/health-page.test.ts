@@ -8,6 +8,7 @@ import { healthPage } from './health-page';
 
 describe('Health Page Component (DOM Rendering)', () => {
     let juris: JurisInstance;
+    let fetchMock: unknown | undefined;
 
     // One-time setup: Create DOM and load Juris
     before(() => {
@@ -31,7 +32,6 @@ describe('Health Page Component (DOM Rendering)', () => {
         juris.registerComponent('healthPage', healthPage as never);
     });
 
-    let fetchMock: ReturnType<typeof mock.method> | undefined;
 
     // Before each test: Clear the body and mock fetch
     beforeEach(() => {
@@ -50,7 +50,7 @@ describe('Health Page Component (DOM Rendering)', () => {
     // Clean up mocks after each test
     afterEach(() => {
         if (fetchMock) {
-            fetchMock.mock.restore();
+            Object(fetchMock).mock.restore();
             fetchMock = undefined;
         }
     });

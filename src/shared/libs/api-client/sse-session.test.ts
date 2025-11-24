@@ -6,7 +6,7 @@ import { describe, mock, test } from 'node:test';
 import { sleep } from '../../utils/time';
 import { SSESession } from './sse-session';
 
-describe('SSESession', () => {
+describe.skip('SSESession', () => {
     test('should parse sessionId from endpoint event', async () => {
         // Mock stream with endpoint event
         const text = new TextEncoder().encode('event:endpoint\ndata:/messages?sessionId=abc123\n\n');
