@@ -1,12 +1,14 @@
 /**
- * Icon Component
+ * icon Component
  * Uses JurisJS CSSExtractor for automatic CSS isolation and scoping
  */
 
-import type { ExtendedStyleObject, JurisComponentFunction, JurisContext, JurisInstance, JurisVDOMElement } from '../../types/juris';
+import type { AppComponent } from '../../main';
+import type { StyleObject } from '../../types/juris';
+import type { IconDefinition } from './svg';
 
 export interface IconProps {
-    svg: JurisVDOMElement;
+    image: IconDefinition;
     onClick?: () => void;
     onHover?: () => void;
     ariaLabel: string;
@@ -14,7 +16,7 @@ export interface IconProps {
 }
 
 /**
- * Icon Component with automatic CSS extraction
+ * icon Component with automatic CSS extraction
  *
  * All styles are defined inline and CSSExtractor automatically:
  * - Extracts static styles to <style> tag with unique class names
@@ -22,11 +24,11 @@ export interface IconProps {
  * - Processes media queries (@media)
  * - Caches extracted CSS to avoid duplication
  */
-export function Icon(props: IconProps, _ctx: JurisContext): JurisVDOMElement {
-    const { svg, onClick, onHover, ariaLabel, title } = props;
+export const icon: AppComponent<IconProps> = (props, _ctx) => {
+    const { image, onClick, onHover, ariaLabel, title } = props;
     const hasInteraction = onClick !== undefined;
 
-    const style: ExtendedStyleObject = {
+    const style: StyleObject = {
         // CSSExtractor processes these styles automatically
         // Base styles (static - extracted to <style> tag)
         display: 'inline-block',
@@ -74,7 +76,7 @@ export function Icon(props: IconProps, _ctx: JurisContext): JurisVDOMElement {
             transition: 'var(--transition-base)',
         },
 
-        // Icon background circle
+        // icon background circle
         '& .icon-bg': {
             fill: 'var(--card-bg)',
             stroke: 'var(--border-color)',
@@ -82,7 +84,7 @@ export function Icon(props: IconProps, _ctx: JurisContext): JurisVDOMElement {
             transition: 'var(--transition-base)',
         },
 
-        // Icon text/path
+        // icon text/path
         '& .icon-text': {
             fill: 'var(--body-color)',
             transition: 'var(--transition-base)',
@@ -115,39 +117,48 @@ export function Icon(props: IconProps, _ctx: JurisContext): JurisVDOMElement {
         },
     };
 
-
     return {
         div: {
             'aria-label': ariaLabel,
             title: title || ariaLabel,
             role: hasInteraction ? 'button' : undefined,
             tabindex: hasInteraction ? '0' : undefined,
-            onClick: onClick || (() => { }),
+            onClick: onClick
+                ? (_e: MouseEvent) => {
+                      console.log('[icon] onClick called, hasInteraction:', hasInteraction);
+                      onClick();
+                  }
+                : undefined,
             onMouseEnter: onHover,
             onkeydown: hasInteraction
                 ? (e: KeyboardEvent) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        if (onClick) {
-                            onClick();
-                        }
-                    }
-                }
+                      if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (onClick) {
+                              onClick();
+                          }
+                      }
+                  }
                 : undefined,
 
             // CSSExtractor processes these styles automatically
             style,
-            children: [svg],
+            children: [
+                {
+                    svg: image,
+                },
+            ],
         },
     };
-}
+};
 
-/**
- * Register Icon component with Juris
- * No more loadCss() - CSSExtractor handles everything!
- */
-export function registerIcon(juris: JurisInstance): void {
-    juris.registerComponent('Icon', Icon as JurisComponentFunction);
+// Register component in App.Components namespace for better type inference
+declare global {
+    namespace App {
+        interface Components {
+            icon: IconProps;
+        }
+    }
 }
 
 export * from './svg';

@@ -12,7 +12,7 @@ type FnO = typeof process.stdout.once;
 
 describe('logger tests', () => {
     test('logs thru logger function', (t) => {
-        const nullFn = mock.fn((str) => {
+        const nullFn = mock.fn((str: string) => {
             strictEqual(typeof str, 'string', JSON.stringify(str));
             ok(str.includes('should log'));
         });
@@ -75,7 +75,7 @@ describe('logger tests', () => {
     test('json logger with params', (t) => {
         const save = process.env.LOG_FORMAT;
         try {
-            const nullFn = mock.fn((obj) => {
+            const nullFn = mock.fn((obj: Record<string, unknown>) => {
                 strictEqual(typeof obj, 'object');
                 strictEqual(typeof obj.message, 'string');
                 strictEqual(obj.message, 'foo:bar');
@@ -93,19 +93,19 @@ describe('logger tests', () => {
 
     test('log with time', (t) => {
         const save = { ...process.env };
+        const fn = mock.fn((str: string) => {
+            match(str, /\d{1,2}T\d{1,2}:\d{1,2}:\d{1,2}\.\d{1,3}Z/);
+        });
         try {
-            const fn = mock.method(console, 'log', (str: string) => {
-                //console.log(str);
-                match(str, /\d{1,2}T\d{1,2}:\d{1,2}:\d{1,2}\.\d{1,3}Z/);
-            });
             process.env.LOG_ADD_TIME = 'true';
             process.env.LOG_FORMAT = 'line';
-            const log = logger.createLogger(t.name, logger.LogLevel.INFO, console);
+            // Use a custom console object instead of mocking the global one
+            const customConsole = makeConsole(fn);
+            const log = logger.createLogger(t.name, logger.LogLevel.INFO, customConsole);
             delete process.env.LOG_ADD_TIME;
             log.info('logs with time');
             strictEqual(fn.mock.calls.length, 1);
         } finally {
-            mock.restoreAll();
             Object.assign(process.env, save);
         }
     });
@@ -205,7 +205,7 @@ describe('logger tests', () => {
             const found = fn.mock.calls.find((c) => Array.isArray(c) && c[0].toString().includes(t.name));
             ok(found, 'log message not found');
         } finally {
-            mock.restoreAll();
+            fn.mock.restore();
         }
     });
 
@@ -277,7 +277,7 @@ describe('logger tests', () => {
     });
 
     test('logger with formatter func', (t) => {
-        const nullFn = mock.fn((str) => {
+        const nullFn = mock.fn((str: string) => {
             ok(str.includes('<6>')); // info level
             ok(str.includes('syslogTest'));
             ok(str.includes(t.name));
@@ -301,7 +301,7 @@ describe('logger tests', () => {
     });
 
     test('logger with object pool', (t) => {
-        const nullFn = mock.fn((obj) => {
+        const nullFn = mock.fn((obj: Record<string, unknown>) => {
             strictEqual(typeof obj, 'object');
             strictEqual(typeof obj.message, 'string');
             strictEqual(obj.message, 'foo:bar');

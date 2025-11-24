@@ -1,1 +1,2 @@
 - integrrate docs with [pages-cms](https://github.com/pages-cms/pages-cms)
+- migrate to classless pico-css https://picocss.com/docs/classless

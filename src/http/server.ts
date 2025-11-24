@@ -134,7 +134,7 @@ export async function registerRoutes(app: FastifyInstance) {
 
     // Inject env vars into HTML files
     const publicDir = join(__dirname, '..', 'public');
-    await registerEnvInject(app, ['index.html', 'mcp-config.html'], publicDir);
+    await registerEnvInject(app, ['index.html'], publicDir);
 
     // Static file serving (must be last to avoid route conflicts)
     await registerStatic(app, '../public', '/');

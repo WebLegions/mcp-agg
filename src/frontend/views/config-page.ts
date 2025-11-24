@@ -4,15 +4,9 @@
  */
 
 import type { MCPServerConfig } from '../../shared/types/mcp-config';
-import type { McpConfigApp } from '../main';
-import type { JurisContext, JurisInstance, JurisVDOM, JurisVDOMElement } from '../types/juris';
+import type { AppComponent } from '../main';
 
-type McpConfigPageProps = {
-    app: McpConfigApp;
-};
-
-export function McpConfigPage(props: McpConfigPageProps, ctx: JurisContext): JurisVDOMElement {
-    const { app } = props;
+export const configPage: AppComponent = (_props, ctx) => {
     return {
         div: {
             children: [
@@ -72,36 +66,28 @@ export function McpConfigPage(props: McpConfigPageProps, ctx: JurisContext): Jur
                                                                     ctx.setState('serverModal.description.value', '');
                                                                     ctx.setState('serverModal.description.error', '');
                                                                     ctx.setState('serverModal.validated', false);
-                                                                    app.render();
                                                                 },
                                                             },
                                                         },
-                                                    ] as JurisVDOM.Element[],
+                                                    ],
                                                 },
                                             },
-                                        ] as JurisVDOM.Element[];
+                                        ];
                                     },
                                 },
                             },
                             {
                                 section: {
-                                    children: [{ ServerTable: {} }],
+                                    children: [{ serverTable: {} }],
                                 },
                             },
                         ],
                     },
                 },
                 {
-                    ServerModal: {},
+                    serverModal: {},
                 },
             ],
         },
     };
-}
-
-/**
- * Register McpConfigPage component with Juris
- */
-export function registerMcpConfigPage(juris: JurisInstance, app: McpConfigApp) {
-    juris.registerComponent('McpConfigPage', (props, ctx) => McpConfigPage({ ...props, app }, ctx));
-}
+};

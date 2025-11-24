@@ -30,8 +30,7 @@ This file provides guidance to Claude Code when working with code in the `src/fr
 
 ## Juris Components
 
-- Generic components under components folder. Each folder has the main component in the index.ts file, a test file and an options style.css file.
-- Register components using `juris.registerComponent()` for all internal application components.
-- This approach leverages JurisJS's CSSExtractor for automatic CSS isolation without the complexity of Shadow DOM.
-- CSSExtractor provides automatic scoping with unique class names (`j-Icon-a7f3d`), eliminating naming collisions without Shadow DOM complexity.
-- read [here](https://medium.com/@resti.guay/juris-js-different-faces-of-components-f152a8924d12) to understand global-state, local-state, API-based state and reactive-rendering in a component.
+- Generic components under components folder. Each folder has the main component in the index.ts file and a test file.
+- Register components using with Juris using `app.registerComponent()`.
+- Minimal styles are embedded in the component using the `StyleComponent` type, an `CSSExtractor` wrapper providing automatic scoping with runtime-generated unique class names (`j-icon-a7f3d`), eliminating naming collisions without Shadow DOM complexity.
+- Read [here](https://medium.com/@resti.guay/juris-js-different-faces-of-components-f152a8924d12) to understand global-state, local-state, API-based state and reactive-rendering in a component.

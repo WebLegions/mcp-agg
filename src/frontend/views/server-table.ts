@@ -4,23 +4,13 @@
  */
 
 import type { MCPServerConfig } from '../../shared/types/mcp-config';
-import { registerDropdownMenu } from '../components/dropdown-menu';
-import { menuIcon, registerIcon } from '../components/icon';
-import type { McpConfigApp } from '../main';
-import type { JurisContext, JurisInstance, JurisVDOMElement } from '../types/juris';
+import { type MenuItem, menu } from '../components/dropdown-menu';
+import { menuIcon } from '../components/icon';
+import type { App, AppComponent, AppVDOMElement } from '../main';
 
-type ServerTableProps = {
-    app: McpConfigApp;
-};
-
-type ServerRowProps = {
-    app: McpConfigApp;
-    server: MCPServerConfig;
-};
-
-export function ServerTable(props: ServerTableProps, ctx: JurisContext): JurisVDOMElement {
-    const loading = ctx.getState<boolean>('servers.loading', true);
-    const error = ctx.getState<string>('servers.error', '');
+export const serverTable: AppComponent = (_props, ctx): AppVDOMElement => {
+    const loading = ctx.getState('servers.loading', true);
+    const error = ctx.getState('servers.error', '');
     const servers = ctx.getState<MCPServerConfig[]>('servers.items', []);
 
     if (loading) {
@@ -93,9 +83,8 @@ export function ServerTable(props: ServerTableProps, ctx: JurisContext): JurisVD
                             {
                                 tbody: {
                                     children: servers.map((server: MCPServerConfig) => ({
-                                        ServerRow: {
+                                        serverRow: {
                                             server,
-                                            app: props.app,
                                         },
                                     })),
                                 },
@@ -106,10 +95,10 @@ export function ServerTable(props: ServerTableProps, ctx: JurisContext): JurisVD
             ],
         },
     };
-}
+};
 
-export function ServerRow(props: ServerRowProps, ctx: JurisContext): JurisVDOMElement {
-    const { server, app } = props;
+export const serverRow: AppComponent<{ server: MCPServerConfig }> = (props, ctx): AppVDOMElement => {
+    const { server } = props;
 
     let commandOrUrl = '';
     if (server.transport === 'stdio') {
@@ -122,6 +111,64 @@ export function ServerRow(props: ServerRowProps, ctx: JurisContext): JurisVDOMEl
     }
 
     const statusText = server.enabled === false ? '✗ Disabled' : '✓ Enabled';
+
+    const openServerModal = (mode: 'edit' | 'add', name: string) => {
+        ctx.setState('ui.serverModalMode', mode);
+        ctx.setState('ui.showServerModal', true);
+        ctx.setState('serverModal.name.value', name);
+        ctx.setState('serverModal.name.error', '');
+        ctx.setState('serverModal.transport.value', server.transport);
+        ctx.setState('serverModal.transport.error', '');
+        ctx.setState('serverModal.command.value', server.transport === 'stdio' ? server.command : '');
+        ctx.setState('serverModal.command.error', '');
+        ctx.setState('serverModal.url.value', server.transport !== 'stdio' ? server.url : '');
+        ctx.setState('serverModal.url.error', '');
+        ctx.setState(
+            'serverModal.args.value',
+            server.transport === 'stdio' && Array.isArray(server.args) ? server.args.join(' ') : '',
+        );
+        ctx.setState('serverModal.args.error', '');
+        ctx.setState('serverModal.enabled.value', server.enabled !== false);
+        ctx.setState('serverModal.enabled.error', '');
+        ctx.setState('serverModal.description.value', server.description || '');
+        ctx.setState('serverModal.description.error', '');
+        ctx.setState('serverModal.validated', false);
+    };
+
+    const handleEdit = () => openServerModal('edit', server.name);
+
+    const handleToggleEnabled = async () => {
+        await ctx.config.enableServer(server.name, server.enabled !== false);
+        ctx.setState('servers.menuId', '');
+    };
+
+    const handleDelete = async () => {
+        if (confirm(`Are you sure you want to delete "${server.name}"?`)) {
+            await ctx.config.deleteServer(server.name);
+            ctx.setState('servers.menuId', '');
+        }
+    };
+
+    const menuItems: MenuItem[] = [
+        {
+            type: 'item',
+            text: 'Edit',
+            onClick: handleEdit,
+        },
+        {
+            type: 'item',
+            text: server.enabled === false ? 'Enable' : 'Disable',
+            onClick: handleToggleEnabled,
+        },
+        {
+            type: 'separator',
+        },
+        {
+            type: 'item',
+            text: 'Delete',
+            onClick: handleDelete,
+        },
+    ];
 
     return {
         tr: {
@@ -168,116 +215,17 @@ export function ServerRow(props: ServerRowProps, ctx: JurisContext): JurisVDOMEl
                     td: {
                         children: [
                             {
-                                DropdownMenu: {
+                                menu: {
                                     id: `server-actions-${server.name}`,
                                     align: 'end',
                                     trigger: {
-                                        Icon: {
-                                            svg: menuIcon,
+                                        icon: {
+                                            image: menuIcon,
                                             ariaLabel: 'Server actions',
                                             title: 'Server actions',
                                         },
                                     },
-                                    children: [
-                                        {
-                                            DropdownMenuItem: {
-                                                text: 'Edit',
-                                                onClick: () => {
-                                                    ctx.setState('ui.serverModalMode', 'edit');
-                                                    ctx.setState('ui.showServerModal', true);
-                                                    ctx.setState('serverModal.name.value', server.name);
-                                                    ctx.setState('serverModal.name.error', '');
-                                                    ctx.setState('serverModal.transport.value', server.transport);
-                                                    ctx.setState('serverModal.transport.error', '');
-                                                    ctx.setState(
-                                                        'serverModal.command.value',
-                                                        server.transport === 'stdio' ? server.command : '',
-                                                    );
-                                                    ctx.setState('serverModal.command.error', '');
-                                                    ctx.setState(
-                                                        'serverModal.url.value',
-                                                        server.transport !== 'stdio' ? server.url : '',
-                                                    );
-                                                    ctx.setState('serverModal.url.error', '');
-                                                    ctx.setState(
-                                                        'serverModal.args.value',
-                                                        server.transport === 'stdio' && Array.isArray(server.args)
-                                                            ? server.args.join(' ')
-                                                            : '',
-                                                    );
-                                                    ctx.setState('serverModal.args.error', '');
-                                                    ctx.setState('serverModal.enabled.value', server.enabled !== false);
-                                                    ctx.setState('serverModal.enabled.error', '');
-                                                    ctx.setState('serverModal.description.value', server.description || '');
-                                                    ctx.setState('serverModal.description.error', '');
-                                                    ctx.setState('serverModal.validated', false);
-                                                    app.render();
-                                                },
-                                            },
-                                        },
-                                        {
-                                            DropdownMenuItem: {
-                                                text: 'Duplicate',
-                                                onClick: () => {
-                                                    ctx.setState('ui.serverModalMode', 'add');
-                                                    ctx.setState('ui.showServerModal', true);
-                                                    ctx.setState('serverModal.name.value', `${server.name}-copy`);
-                                                    ctx.setState('serverModal.name.error', '');
-                                                    ctx.setState('serverModal.transport.value', server.transport);
-                                                    ctx.setState('serverModal.transport.error', '');
-                                                    ctx.setState(
-                                                        'serverModal.command.value',
-                                                        server.transport === 'stdio' ? server.command : '',
-                                                    );
-                                                    ctx.setState('serverModal.command.error', '');
-                                                    ctx.setState(
-                                                        'serverModal.url.value',
-                                                        server.transport !== 'stdio' ? server.url : '',
-                                                    );
-                                                    ctx.setState('serverModal.url.error', '');
-                                                    ctx.setState(
-                                                        'serverModal.args.value',
-                                                        server.transport === 'stdio' && Array.isArray(server.args)
-                                                            ? server.args.join(' ')
-                                                            : '',
-                                                    );
-                                                    ctx.setState('serverModal.args.error', '');
-                                                    ctx.setState('serverModal.enabled.value', server.enabled !== false);
-                                                    ctx.setState('serverModal.enabled.error', '');
-                                                    ctx.setState('serverModal.description.value', server.description || '');
-                                                    ctx.setState('serverModal.description.error', '');
-                                                    ctx.setState('serverModal.validated', false);
-                                                    app.render();
-                                                },
-                                            },
-                                        },
-                                        {
-                                            DropdownMenuSeparator: {},
-                                        },
-                                        {
-                                            DropdownMenuItem: {
-                                                text: server.enabled === false ? 'Enable' : 'Disable',
-                                                onClick: async () => {
-                                                    await app.enableServer(server.name, server.enabled !== false);
-                                                    ctx.setState('servers.menuId', '');
-                                                },
-                                            },
-                                        },
-                                        {
-                                            DropdownMenuSeparator: {},
-                                        },
-                                        {
-                                            DropdownMenuItem: {
-                                                text: 'Delete',
-                                                onClick: async () => {
-                                                    if (confirm(`Are you sure you want to delete "${server.name}"?`)) {
-                                                        await app.deleteServer(server.name);
-                                                        ctx.setState('servers.menuId', '');
-                                                    }
-                                                },
-                                            },
-                                        },
-                                    ],
+                                    items: menuItems,
                                 },
                             },
                         ],
@@ -286,14 +234,13 @@ export function ServerRow(props: ServerRowProps, ctx: JurisContext): JurisVDOMEl
             ],
         },
     };
-}
+};
 
 /**
- * Register ServerTable and ServerRow components with Juris
+ * Register serverTable and serverRow components with App
  */
-export function registerServerTable(juris: JurisInstance, app: McpConfigApp) {
-    registerDropdownMenu(juris);
-    registerIcon(juris);
-    juris.registerComponent('ServerTable', (props, ctx) => ServerTable({ ...props, app }, ctx));
-    juris.registerComponent('ServerRow', (props, ctx) => ServerRow({ ...(props as { server: MCPServerConfig }), app }, ctx));
+export function registerServerTable(app: App) {
+    app.registerComponent('menu', menu as never);
+    app.registerComponent('serverTable', serverTable as never);
+    app.registerComponent('serverRow', serverRow as never);
 }

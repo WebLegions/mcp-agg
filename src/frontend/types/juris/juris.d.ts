@@ -6,17 +6,17 @@
 // Smart utility types that handle both sync and async variants
 type SafeDotNotation<T> = T extends Record<string, any>
     ? {
-        [K in keyof T]: K extends string ? (T[K] extends Record<string, any> ? K | `${K}.${string}` : K) : never;
-    }[keyof T]
+          [K in keyof T]: K extends string ? (T[K] extends Record<string, any> ? K | `${K}.${string}` : K) : never;
+      }[keyof T]
     : string;
 
 type SafePathValue<T, P extends string> = P extends keyof T
     ? T[P]
     : P extends `${infer K}.${string}`
-    ? K extends keyof T
-    ? any // Simplified to avoid deep recursion
-    : never
-    : never;
+      ? K extends keyof T
+          ? any // Simplified to avoid deep recursion
+          : never
+      : never;
 
 // Smart async support - makes any type work with Promise variants
 type MaybeAsync<T> = T | Promise<T>;
@@ -1197,30 +1197,30 @@ interface SVGProperties {
 // Complete CSS Properties interface
 interface CSSProperties
     extends TransformProperties,
-    BackgroundProperties,
-    BorderProperties,
-    SpacingProperties,
-    FontProperties,
-    TextProperties,
-    FlexboxProperties,
-    GridProperties,
-    AnimationProperties,
-    TransitionProperties,
-    PositionProperties,
-    FilterProperties,
-    ScrollProperties,
-    ModernCSSProperties,
-    InteractionProperties,
-    ColorProperties,
-    LayoutProperties,
-    ShadowProperties,
-    TableProperties,
-    ListProperties,
-    OutlineProperties,
-    ContentProperties,
-    RubyProperties,
-    PrintProperties,
-    SVGProperties {
+        BackgroundProperties,
+        BorderProperties,
+        SpacingProperties,
+        FontProperties,
+        TextProperties,
+        FlexboxProperties,
+        GridProperties,
+        AnimationProperties,
+        TransitionProperties,
+        PositionProperties,
+        FilterProperties,
+        ScrollProperties,
+        ModernCSSProperties,
+        InteractionProperties,
+        ColorProperties,
+        LayoutProperties,
+        ShadowProperties,
+        TableProperties,
+        ListProperties,
+        OutlineProperties,
+        ContentProperties,
+        RubyProperties,
+        PrintProperties,
+        SVGProperties {
     // CSS Custom Properties (CSS Variables)
     [key: `--${string}`]: ReactiveValue<string | number>;
 
@@ -2163,18 +2163,18 @@ export namespace JurisVDOM {
 
     type ValidateComponentElement<T> = T extends { [K in infer U]: any }
         ? U extends string
-        ? U extends HTMLElementNames
-        ? T // HTML elements are valid
-        : U extends keyof Juris.RegisteredComponents
-        ? T // Registered components are valid
-        : ComponentRegistrationError<U> // Show custom error for unregistered
-        : never
+            ? U extends HTMLElementNames
+                ? T // HTML elements are valid
+                : U extends keyof Juris.RegisteredComponents
+                  ? T // Registered components are valid
+                  : ComponentRegistrationError<U> // Show custom error for unregistered
+            : never
         : never;
 
     type ValidatedChildren<T> = T extends (infer U)[]
         ? ValidateComponentElement<U> extends string
-        ? ValidateComponentElement<U> // Return error message
-        : T // Valid children array
+            ? ValidateComponentElement<U> // Return error message
+            : T // Valid children array
         : T;
     // Element union type - defined after all interfaces to avoid circular references
     export type Element =
@@ -2293,10 +2293,10 @@ export namespace JurisVDOM {
 type RegisteredComponentElements = keyof Juris.RegisteredComponents extends never
     ? never // No components registered = no component elements allowed
     : {
-        [K in keyof Juris.RegisteredComponents]: {
-            [P in K]: ComponentElement & Juris.RegisteredComponents[K];
-        };
-    }[keyof Juris.RegisteredComponents];
+          [K in keyof Juris.RegisteredComponents]: {
+              [P in K]: ComponentElement & Juris.RegisteredComponents[K];
+          };
+      }[keyof Juris.RegisteredComponents];
 
 export type ValidateComponent<T> = ValidateComponentElement<T>;
 export type ComponentValidationError<T extends string> = ComponentRegistrationError<T>;
@@ -2305,15 +2305,15 @@ export type ComponentValidationError<T extends string> = ComponentRegistrationEr
 export type JurisVDOMElement =
     | JurisVDOM.Element
     | (keyof Juris.RegisteredComponents extends never
-        ? never
-        : {
-            [K in keyof Juris.RegisteredComponents]: {
-                [P in K]: Juris.RegisteredComponents[K] & {
-                    children?: ReactiveValue<JurisVDOMElement[]>;
-                    key?: string | number;
+          ? never
+          : {
+                [K in keyof Juris.RegisteredComponents]: {
+                    [P in K]: Juris.RegisteredComponents[K] & {
+                        children?: ReactiveValue<JurisVDOMElement[]>;
+                        key?: string | number;
+                    };
                 };
-            };
-        }[keyof Juris.RegisteredComponents]);
+            }[keyof Juris.RegisteredComponents]);
 export type JurisElementOptions = JurisVDOM.ElementOptions;
 
 // Also export individual element types for advanced usage
@@ -2330,26 +2330,26 @@ export type JurisFormElement = JurisVDOM.FormElement;
 // Simplified but powerful state management - supports both typed and untyped usage
 export interface ComponentState<TState = any> {
     getState: TState extends Record<string, any>
-    ? {
-        // Overload for typed usage with dot notation
-        <TPath extends SafeDotNotation<TState>>(
-            path: TPath,
-            defaultValue?: SafePathValue<TState, TPath>,
-            track?: boolean,
-        ): SafePathValue<TState, TPath>;
-        // Overload for generic string paths
-        <T>(path: string, defaultValue?: T, track?: boolean): T;
-    }
-    : <T>(path: string, defaultValue?: T, track?: boolean) => T;
+        ? {
+              // Overload for typed usage with dot notation
+              <TPath extends SafeDotNotation<TState>>(
+                  path: TPath,
+                  defaultValue?: SafePathValue<TState, TPath>,
+                  track?: boolean,
+              ): SafePathValue<TState, TPath>;
+              // Overload for generic string paths
+              <T>(path: string, defaultValue?: T, track?: boolean): T;
+          }
+        : <T>(path: string, defaultValue?: T, track?: boolean) => T;
 
     setState: TState extends Record<string, any>
-    ? {
-        // Overload for typed usage with dot notation
-        <TPath extends SafeDotNotation<TState>>(path: TPath, value: SafePathValue<TState, TPath>): void;
-        // Overload for generic string paths
-        <T>(path: string, value: T): void;
-    }
-    : <T>(path: string, value: T) => void;
+        ? {
+              // Overload for typed usage with dot notation
+              <TPath extends SafeDotNotation<TState>>(path: TPath, value: SafePathValue<TState, TPath>): void;
+              // Overload for generic string paths
+              <T>(path: string, value: T): void;
+          }
+        : <T>(path: string, value: T) => void;
 }
 
 // Base context interface (shared properties)
@@ -2389,18 +2389,18 @@ interface JurisContextCore extends ComponentState<any> {
 // Generic JurisContext interface for TypeScript usage
 export interface JurisContext<TState = any> extends JurisContextCore, ComponentState<TState> {
     subscribe?: TState extends Record<string, any>
-    ? {
-        <TPath extends SafeDotNotation<TState>>(
-            path: TPath,
-            callback: (
-                newValue: SafePathValue<TState, TPath>,
-                oldValue: SafePathValue<TState, TPath>,
-                path: string,
-            ) => void,
-        ): () => void;
-        (path: string, callback: (newValue: any, oldValue: any, path: string) => void): () => void;
-    }
-    : (path: string, callback: (newValue: any, oldValue: any, path: string) => void) => () => void;
+        ? {
+              <TPath extends SafeDotNotation<TState>>(
+                  path: TPath,
+                  callback: (
+                      newValue: SafePathValue<TState, TPath>,
+                      oldValue: SafePathValue<TState, TPath>,
+                      path: string,
+                  ) => void,
+              ): () => void;
+              (path: string, callback: (newValue: any, oldValue: any, path: string) => void): () => void;
+          }
+        : (path: string, callback: (newValue: any, oldValue: any, path: string) => void) => () => void;
     components?: {
         register: (name: string, component: JurisComponentFunction<TState>) => void;
         registerHeadless: (name: string, component: any, options?: any) => void;
@@ -2425,11 +2425,11 @@ export type JurisComponentFunction<P = Record<string, any>, TState = any> = (
 ) =>
     | JurisVDOMElement
     | {
-        render: () => AsyncCapable<JurisVDOMElement>;
-        indicator?: JurisVDOMElement;
-        hooks?: ComponentHooks;
-        api?: Record<string, any>;
-    };
+          render: () => AsyncCapable<JurisVDOMElement>;
+          indicator?: JurisVDOMElement;
+          hooks?: ComponentHooks;
+          api?: Record<string, any>;
+      };
 
 // Lifecycle hooks with smart async support
 export interface ComponentHooks {
@@ -2459,51 +2459,51 @@ export interface HeadlessComponent {
 export interface JurisInstance<TState = {}> {
     // State management with better type support
     getState: TState extends Record<string, any>
-    ? {
-        <TPath extends SafeDotNotation<TState>>(
-            path: TPath,
-            defaultValue?: SafePathValue<TState, TPath>,
-            track?: boolean,
-        ): SafePathValue<TState, TPath>;
-        <T>(path: string, defaultValue?: T, track?: boolean): T;
-    }
-    : <T>(path: string, defaultValue?: T, track?: boolean) => T;
+        ? {
+              <TPath extends SafeDotNotation<TState>>(
+                  path: TPath,
+                  defaultValue?: SafePathValue<TState, TPath>,
+                  track?: boolean,
+              ): SafePathValue<TState, TPath>;
+              <T>(path: string, defaultValue?: T, track?: boolean): T;
+          }
+        : <T>(path: string, defaultValue?: T, track?: boolean) => T;
 
     setState: TState extends Record<string, any>
-    ? {
-        <TPath extends SafeDotNotation<TState>>(path: TPath, value: SafePathValue<TState, TPath>, context?: any): void;
-        <T>(path: string, value: T, context?: any): void;
-    }
-    : <T>(path: string, value: T, context?: any) => void;
+        ? {
+              <TPath extends SafeDotNotation<TState>>(path: TPath, value: SafePathValue<TState, TPath>, context?: any): void;
+              <T>(path: string, value: T, context?: any): void;
+          }
+        : <T>(path: string, value: T, context?: any) => void;
 
     subscribe: TState extends Record<string, any>
-    ? {
-        <TPath extends SafeDotNotation<TState>>(
-            path: TPath,
-            callback: (
-                newValue: SafePathValue<TState, TPath>,
-                oldValue: SafePathValue<TState, TPath>,
-                path: string,
-            ) => void,
-            hierarchical?: boolean,
-        ): () => void;
-        (path: string, callback: (newValue: any, oldValue: any, path: string) => void, hierarchical?: boolean): () => void;
-    }
-    : (path: string, callback: (newValue: any, oldValue: any, path: string) => void, hierarchical?: boolean) => () => void;
+        ? {
+              <TPath extends SafeDotNotation<TState>>(
+                  path: TPath,
+                  callback: (
+                      newValue: SafePathValue<TState, TPath>,
+                      oldValue: SafePathValue<TState, TPath>,
+                      path: string,
+                  ) => void,
+                  hierarchical?: boolean,
+              ): () => void;
+              (path: string, callback: (newValue: any, oldValue: any, path: string) => void, hierarchical?: boolean): () => void;
+          }
+        : (path: string, callback: (newValue: any, oldValue: any, path: string) => void, hierarchical?: boolean) => () => void;
 
     subscribeExact: TState extends Record<string, any>
-    ? {
-        <TPath extends SafeDotNotation<TState>>(
-            path: TPath,
-            callback: (
-                newValue: SafePathValue<TState, TPath>,
-                oldValue: SafePathValue<TState, TPath>,
-                path: string,
-            ) => void,
-        ): () => void;
-        (path: string, callback: (newValue: any, oldValue: any, path: string) => void): () => void;
-    }
-    : (path: string, callback: (newValue: any, oldValue: any, path: string) => void) => () => void;
+        ? {
+              <TPath extends SafeDotNotation<TState>>(
+                  path: TPath,
+                  callback: (
+                      newValue: SafePathValue<TState, TPath>,
+                      oldValue: SafePathValue<TState, TPath>,
+                      path: string,
+                  ) => void,
+              ): () => void;
+              (path: string, callback: (newValue: any, oldValue: any, path: string) => void): () => void;
+          }
+        : (path: string, callback: (newValue: any, oldValue: any, path: string) => void) => () => void;
 
     // NEW: Batch processing methods
 
@@ -2549,7 +2549,7 @@ export interface JurisInstance<TState = {}> {
 
 // Constructor interface
 export interface JurisConstructor {
-    new(config?: JurisConfig): JurisInstance<any>;
+    new (config?: JurisConfig): JurisInstance<any>;
 }
 
 // Main Juris class export
@@ -2618,7 +2618,7 @@ declare global {
 declare global {
     namespace Juris {
         // Apps can extend this interface
-        interface RegisteredComponents { }
+        interface RegisteredComponents {}
 
         // If components are registered, use them, otherwise fall back to generic
         type ComponentDefinition = keyof RegisteredComponents extends never

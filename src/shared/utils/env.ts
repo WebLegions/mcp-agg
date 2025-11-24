@@ -217,7 +217,7 @@ NODE_ENV: ${Env.nodeEnv}${serverInfo}
     static get<T extends object>(key: string, def: T): T;
     static get(key: string, def: string, min?: string, max?: string): string;
     static get<T = unknown>(key: string, def: T, min?: T, max?: T): T {
-        const raw = process.env[key];
+        const raw = Env.vars[key];
         let rc: unknown;
         switch (typeof def) {
             case 'boolean':
@@ -264,7 +264,7 @@ NODE_ENV: ${Env.nodeEnv}${serverInfo}
     static print(logger?: Console) {
         if (logger) logger.log(Env._out);
         else if (typeof process !== 'undefined') process.stdout.write(Env._out);
-        else console.info(Env._out);
+        else console.log(Env._out);
     }
 
     static get vars() {
@@ -272,7 +272,7 @@ NODE_ENV: ${Env.nodeEnv}${serverInfo}
     }
 
     // just to keep the linter happy
-    private constructor() { }
+    private constructor() {}
 }
 
 // Initialize at module load

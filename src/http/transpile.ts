@@ -3,6 +3,7 @@ import { access, readFile } from 'node:fs/promises';
 import { join, matchesGlob, normalize, resolve } from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Env } from '../shared/utils/env';
+import { debounce } from '../shared/utils/time';
 import { atExit, stat } from '../utils';
 import type { WithParams, WithQuerystring } from './route-types';
 
@@ -83,22 +84,30 @@ async function addTsExtensions(code: string, filePath: string): Promise<string> 
         const { match, prefix, path, suffix, index } = matches[i];
 
         let replacement: string | undefined;
+
+        // Check if the path already has an extension >> leave as it
+        if (/\.[a-zA-Z0-9]+$/.test(path)) {
+            continue;
+        }
+
+        // Try to resolve the given path first
         const resolvedPath = resolve(fileDir, path);
         const [stats, _err] = await stat(resolvedPath);
 
         if (stats?.isDirectory()) {
             // Directory import - add /index.ts
             replacement = `${prefix}${path}/index.ts${suffix}`;
-        } else if (stats) {
-            // Exists as file - where good
-            continue;
         } else {
-            // if path does not exist and no extension -> assume .ts
-            if (!/\.[a-zA-Z0-9]+$/.test(path)) {
+            // Check if there's a .ts file that matches path
+            const resolvedPathWithTs = resolve(fileDir, `${path}.ts`);
+            const [statsTs, _errTs] = await stat(resolvedPathWithTs);
+
+            if (statsTs) {
+                // .ts file exists - add .ts extension
                 replacement = `${prefix}${path}.ts${suffix}`;
             } else {
-                // not found and has extension - we canoot do much about it
-                continue;
+                // Neither exists, assume .ts anyway
+                replacement = `${prefix}${path}.ts${suffix}`;
             }
         }
 
@@ -239,10 +248,14 @@ export function registerTranspile(app: FastifyInstance, localPath: string, remot
 
     // In development mode, watch for file changes and clear cache
     if (Env.isDevelopment) {
-        const watcher = watchFile(normalizedLocalPath, { recursive: true }, (eventType, filename) => {
+        const onFileChange = debounce(() => {
+            cache.clear();
+            console.log(`[transpile] Cache cleared: ${new Date().toISOString()}`);
+        }, 1000);
+
+        const watcher = watchFile(normalizedLocalPath, { recursive: true }, (eventType: string, filename: string | null) => {
             if (filename && (eventType === 'change' || eventType === 'rename')) {
-                cache.clear();
-                console.log(`[transpile] Cache cleared`);
+                onFileChange();
             }
         });
 
@@ -256,7 +269,7 @@ export function registerTranspile(app: FastifyInstance, localPath: string, remot
 /**
  * Registers custom HTML routes that inject env vars into <head> for specified files, using shared cache.
  * @param app Fastify instance
- * @param filesToInject Array of public HTML filenames (e.g. ['index.html', 'mcp-config.html'])
+ * @param filesToInject Array of public HTML filenames (e.g. ['index.html'])
  * @param publicDir Absolute path to public directory
  */
 export async function registerEnvInject(app: FastifyInstance, filesToInject: string[], publicDir: string) {
@@ -266,14 +279,10 @@ export async function registerEnvInject(app: FastifyInstance, filesToInject: str
         await access(filePath).catch(() => {
             throw new Error(`[env-inject] File not found: ${filePath}`);
         });
-        app.get(`/${file}`, async (request: FastifyRequest, reply: FastifyReply) => {
-            // Only serve if Accept header prefers text/html
-            try {
-                const accept = request.headers.accept ?? '';
-                if (!accept.includes('text/html')) {
-                    return;
-                }
 
+        // Create handler function to be reused for multiple routes
+        const handler = async (_request: FastifyRequest, reply: FastifyReply) => {
+            try {
                 const cacheKey = `html:${filePath}`;
                 let html: string;
                 const cached = cache.get(cacheKey);
@@ -296,17 +305,25 @@ export async function registerEnvInject(app: FastifyInstance, filesToInject: str
                     const envScript = `<script>window.env = ${JSON.stringify(envVars)};</script>`;
 
                     html = await readFile(filePath, 'utf8');
-                    const headRegex = /<head(\s*[^>]*)>/i;
-                    html = html.replace(headRegex, (match) => `${match}\n${envScript}`);
+                    const headRegex = /<\/head>/i;
+                    html = html.replace(headRegex, (match) => `${envScript}\n${match}`);
                     console.log(`[env-inject] Injected ${Object.keys(envVars).length} env vars into ${file}`);
                     cache.set(cacheKey, { content: html, mtime, minified: false, mimeType: 'text/html' });
                     reply.header('X-Cache', 'MISS');
                 }
-                reply.type('text/html').send(html);
+                return reply.type('text/html').send(html);
             } catch (err) {
                 console.error(`[env-inject] Error reading ${file}:`, err);
-                return;
+                return reply.code(500).send('Internal server error');
             }
-        });
+        };
+
+        // Register handler for the file path
+        app.get(`/${file}`, handler);
+
+        // If this is index.html, also register for root path
+        if (file === 'index.html') {
+            app.get('/', handler);
+        }
     }
 }

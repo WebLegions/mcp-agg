@@ -82,7 +82,7 @@ const processOutput = (data: string, stream: NodeJS.WriteStream): void => {
             // Always reset ANSI codes after each line to prevent color bleeding
             stream.write(`${line}\x1b[0m\n`);
         } else {
-            stream.write(`Elapsed: ${Math.round((Date.now() - start) / 100) / 10}s  \r`);
+            stream.write(`${Math.round((Date.now() - start) / 100) / 10}  \r`);
         }
     }
 };

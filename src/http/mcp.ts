@@ -285,7 +285,7 @@ function setupConfigManager(): void {
     configManagerSetup = true;
 
     // Disable file watching in test environment to prevent hanging
-    const isTest = process.env.NODE_ENV === 'test' || process.env.BUN_ENV === 'test';
+    const isTest = Env.get('NODE_ENV', 'production') === 'test';
     const watch = !isTest;
 
     // Get manager (auto-initializes on first call)

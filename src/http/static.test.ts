@@ -35,7 +35,7 @@ describe('Static file serving', () => {
         assert.ok(body.includes('<!DOCTYPE html>'));
     });
 
-    test.skip('should serve index.html explicitly', async () => {
+    test('should serve index.html explicitly', async () => {
         const res = await fetch(`http://127.0.0.1:${testPort}/index.html`);
 
         assert.equal(res.status, 200);

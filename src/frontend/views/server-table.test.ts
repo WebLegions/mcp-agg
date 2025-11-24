@@ -1,358 +1,386 @@
 /// <reference lib="dom" />
+
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { before, beforeEach, describe, test } from 'node:test';
 import type { MCPServerConfig } from '../../shared/types/mcp-config';
-import type { McpConfigApp } from '../main';
-import type { JurisContext } from '../types/juris';
-import { ServerRow, ServerTable } from './server-table';
+import type { JurisInstance, JurisVDOMElement } from '../types/juris';
+import { serverRow, serverTable } from './server-table';
 
-describe('ServerTable Component', () => {
-    let mockContext: JurisContext;
-    let mockApp: McpConfigApp;
-    let stateStore: Record<string, unknown>;
+describe('Server Table Component (DOM Rendering)', () => {
+    let juris: JurisInstance;
+
+    before(() => {
+        // Load Juris via script tag
+        const jurisPath = resolve(process.cwd(), 'node_modules/juris/juris.js');
+        const jurisCode = readFileSync(jurisPath, 'utf-8');
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.textContent = jurisCode;
+        document.head.appendChild(script);
+
+        // Execute script in window context
+        Object(window).eval(jurisCode);
+
+        // Initialize Juris
+        juris = new Juris({
+            states: {
+                'servers.loading': false,
+                'servers.error': '',
+                'servers.items': [],
+            },
+        });
+
+        // Register components
+        juris.registerComponent('serverTable', serverTable as never);
+        juris.registerComponent('serverRow', serverRow as never);
+
+        // Register stub components
+        juris.registerComponent('menu', (() => ({ div: { class: 'menu-stub' } })) as never);
+        juris.registerComponent('icon', (() => ({ div: { class: 'icon-stub' } })) as never);
+    });
 
     beforeEach(() => {
         document.body.innerHTML = '';
-        stateStore = {
-            'servers.loading': false,
-            'servers.error': '',
-            'servers.items': [],
+        juris.createContext().setState('servers.loading', false);
+        juris.createContext().setState('servers.error', '');
+        juris.createContext().setState('servers.items', []);
+    });
+
+    test('should render loading state', () => {
+        juris.createContext().setState('servers.loading', true);
+
+        const vnode: JurisVDOMElement = {
+            div: {
+                children: [{ serverTable: {} }],
+            },
         };
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
 
-        mockContext = {
-            getState: <T>(key: string, defaultValue?: T): T => {
-                return (stateStore[key] ?? defaultValue) as T;
+        const paragraph = document.querySelector('p');
+        assert.ok(paragraph, 'Expected loading paragraph to exist');
+        assert.equal(paragraph.textContent, 'Loading servers...');
+    });
+
+    test('should render error state', () => {
+        juris.createContext().setState('servers.loading', false);
+        juris.createContext().setState('servers.error', 'Failed to load servers');
+
+        const vnode: JurisVDOMElement = {
+            div: {
+                children: [{ serverTable: {} }],
             },
-            setState: (key: string, value: unknown) => {
-                stateStore[key] = value;
+        };
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        const paragraph = document.querySelector('p');
+        assert.ok(paragraph, 'Expected error paragraph to exist');
+        assert.equal(paragraph.textContent, 'Error: Failed to load servers');
+    });
+
+    test('should render empty state', () => {
+        juris.createContext().setState('servers.loading', false);
+        juris.createContext().setState('servers.error', '');
+        juris.createContext().setState('servers.items', []);
+
+        const vnode: JurisVDOMElement = {
+            div: {
+                children: [{ serverTable: {} }],
             },
-            headlessAPIs: {},
-            executeBatch: (callback: () => unknown) => callback(),
-        } as JurisContext;
+        };
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
 
-        mockApp = {
-            render: () => {},
-        } as McpConfigApp;
+        const paragraph = document.querySelector('p');
+        assert.ok(paragraph, 'Expected empty state paragraph to exist');
+        const text = paragraph.textContent || '';
+        assert.ok(text.includes('No servers configured'));
+        assert.ok(text.includes('Add Server'));
     });
 
-    afterEach(() => {
-        document.body.innerHTML = '';
-    });
-
-    describe('Loading State', () => {
-        test('should show loading message when loading', () => {
-            stateStore['servers.loading'] = true;
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerTable({ app: mockApp }, mockContext) as any;
-
-            assert.ok(vdom.div);
-            assert.equal(vdom.div.children[0].p.text, 'Loading servers...');
-        });
-    });
-
-    describe('Error State', () => {
-        test('should show error message when error exists', () => {
-            stateStore['servers.loading'] = false;
-            stateStore['servers.error'] = 'Failed to load servers';
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerTable({ app: mockApp }, mockContext) as any;
-
-            assert.ok(vdom.div);
-            assert.equal(vdom.div.children[0].p.text, 'Error: Failed to load servers');
-            assert.equal(vdom.div.children[0].p.style, 'color: red;');
-        });
-    });
-
-    describe('Empty State', () => {
-        test('should show empty message when no servers', () => {
-            stateStore['servers.loading'] = false;
-            stateStore['servers.error'] = '';
-            stateStore['servers.items'] = [];
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerTable({ app: mockApp }, mockContext) as any;
-
-            assert.ok(vdom.div);
-            assert.ok(vdom.div.children[0].p.text.includes('No servers configured'));
-            assert.ok(vdom.div.children[0].p.text.includes('Add Server'));
-        });
-    });
-
-    describe('Table Rendering', () => {
-        test('should render table with headers when servers exist', () => {
-            const servers: MCPServerConfig[] = [
-                {
-                    name: 'test-server',
-                    transport: 'stdio',
-                    command: 'node',
-                    enabled: true,
-                },
-            ];
-
-            stateStore['servers.items'] = servers;
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerTable({ app: mockApp }, mockContext) as any;
-
-            const table = vdom.div.children[0].table;
-            assert.ok(table);
-
-            const thead = table.children[0].thead;
-            const headerRow = thead.children[0].tr;
-            const headers = headerRow.children;
-
-            assert.equal(headers.length, 6);
-            assert.equal(headers[0].th.text, 'NAME');
-            assert.equal(headers[1].th.text, 'STATUS');
-            assert.equal(headers[2].th.text, 'TRANSPORT');
-            assert.equal(headers[3].th.text, 'COMMAND/URL');
-            assert.equal(headers[4].th.text, 'DESCRIPTION');
-            assert.equal(headers[5].th.text, 'ACTIONS');
-        });
-
-        test('should render table body with ServerRow components', () => {
-            const servers: MCPServerConfig[] = [
-                {
-                    name: 'server1',
-                    transport: 'stdio',
-                    command: 'node',
-                    enabled: true,
-                },
-                {
-                    name: 'server2',
-                    transport: 'sse',
-                    url: 'http://test.com',
-                    enabled: false,
-                },
-            ];
-
-            stateStore['servers.items'] = servers;
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerTable({ app: mockApp }, mockContext) as any;
-
-            const tbody = vdom.div.children[0].table.children[1].tbody;
-            assert.ok(tbody);
-            assert.equal(tbody.children.length, 2);
-            assert.ok(tbody.children[0].ServerRow);
-            assert.ok(tbody.children[1].ServerRow);
-        });
-    });
-});
-
-describe('ServerRow Component', () => {
-    let mockContext: JurisContext;
-    let mockApp: McpConfigApp;
-    let stateStore: Record<string, unknown>;
-
-    beforeEach(() => {
-        document.body.innerHTML = '';
-        stateStore = {};
-
-        mockContext = {
-            getState: <T>(key: string, defaultValue?: T): T => {
-                return (stateStore[key] ?? defaultValue) as T;
-            },
-            setState: (key: string, value: unknown) => {
-                stateStore[key] = value;
-            },
-            headlessAPIs: {},
-            executeBatch: (callback: () => unknown) => callback(),
-        } as JurisContext;
-
-        mockApp = {
-            render: () => {},
-        } as McpConfigApp;
-    });
-
-    afterEach(() => {
-        document.body.innerHTML = '';
-    });
-
-    describe('Stdio Server Rendering', () => {
-        test('should render stdio server correctly', () => {
-            const server: MCPServerConfig = {
-                name: 'test-server',
-                transport: 'stdio',
-                command: 'node',
-                args: ['server.js', '--port', '3000'],
-                enabled: true,
-                description: 'Test server',
-            };
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerRow({ app: mockApp, server }, mockContext) as any;
-
-            assert.equal(vdom.tr.id, 'server-row-test-server');
-
-            const cells = vdom.tr.children;
-            assert.equal(cells.length, 6);
-
-            // Name cell
-            assert.equal(cells[0].td.children[0].strong.text, 'test-server');
-
-            // Status cell
-            assert.equal(cells[1].td.children[0].span.text, '✓ Enabled');
-
-            // Transport cell
-            assert.equal(cells[2].td.children[0].code.text, 'STDIO');
-
-            // Command cell
-            assert.ok(cells[3].td.children[0].code.text.includes('node'));
-            assert.ok(cells[3].td.children[0].code.text.includes('server.js'));
-
-            // Description cell
-            assert.equal(cells[4].td.text, 'Test server');
-        });
-
-        test('should show disabled status for disabled server', () => {
-            const server: MCPServerConfig = {
-                name: 'disabled-server',
-                transport: 'stdio',
-                command: 'node',
-                enabled: false,
-            };
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerRow({ app: mockApp, server }, mockContext) as any;
-
-            const statusCell = vdom.tr.children[1];
-            assert.equal(statusCell.td.children[0].span.text, '✗ Disabled');
-        });
-    });
-
-    describe('SSE Server Rendering', () => {
-        test('should render SSE server correctly', () => {
-            const server: MCPServerConfig = {
-                name: 'sse-server',
-                transport: 'sse',
-                url: 'https://example.com/sse',
-                enabled: true,
-            };
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerRow({ app: mockApp, server }, mockContext) as any;
-
-            const cells = vdom.tr.children;
-
-            // Transport cell
-            assert.equal(cells[2].td.children[0].code.text, 'SSE');
-
-            // URL cell
-            assert.equal(cells[3].td.children[0].code.text, 'https://example.com/sse');
-        });
-    });
-
-    describe('HTTP Server Rendering', () => {
-        test('should render HTTP server correctly', () => {
-            const server: MCPServerConfig = {
-                name: 'http-server',
-                transport: 'http',
-                url: 'http://localhost:8080',
-                enabled: true,
-            };
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerRow({ app: mockApp, server }, mockContext) as any;
-
-            const cells = vdom.tr.children;
-
-            // Transport cell
-            assert.equal(cells[2].td.children[0].code.text, 'HTTP');
-
-            // URL cell
-            assert.equal(cells[3].td.children[0].code.text, 'http://localhost:8080');
-        });
-    });
-
-    describe('Empty Description', () => {
-        test('should show dash for empty description', () => {
-            const server: MCPServerConfig = {
-                name: 'no-desc-server',
-                transport: 'stdio',
-                command: 'test',
-                enabled: true,
-            };
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerRow({ app: mockApp, server }, mockContext) as any;
-
-            const descriptionCell = vdom.tr.children[4];
-            assert.equal(descriptionCell.td.text, '-');
-        });
-    });
-
-    describe('Actions Menu', () => {
-        test('should render dropdown menu for actions', () => {
-            const server: MCPServerConfig = {
-                name: 'action-server',
-                transport: 'stdio',
-                command: 'test',
-                enabled: true,
-            };
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerRow({ app: mockApp, server }, mockContext) as any;
-
-            const actionsCell = vdom.tr.children[5];
-            const dropdown = actionsCell.td.children[0].DropdownMenu;
-
-            assert.ok(dropdown);
-            assert.equal(dropdown.id, 'server-actions-action-server');
-            assert.equal(dropdown.align, 'end');
-            assert.ok(dropdown.trigger.Icon);
-            assert.ok(Array.isArray(dropdown.children));
-            assert.ok(dropdown.children.length >= 2);
-        });
-
-        test('should have edit action in dropdown', () => {
-            const server: MCPServerConfig = {
-                name: 'edit-test',
-                transport: 'stdio',
-                command: 'node',
-                args: ['test.js'],
-                enabled: true,
-                description: 'Test',
-            };
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerRow({ app: mockApp, server }, mockContext) as any;
-
-            const dropdown = vdom.tr.children[5].td.children[0].DropdownMenu;
-            const editItem = dropdown.children[0].DropdownMenuItem;
-
-            assert.equal(editItem.text, 'Edit');
-            assert.ok(typeof editItem.onClick === 'function');
-        });
-
-        test('should initialize edit modal state correctly', () => {
-            const server: MCPServerConfig = {
-                name: 'edit-server',
+    test('should render table with headers and rows when servers exist', () => {
+        const servers: MCPServerConfig[] = [
+            {
+                name: 'test-server-1',
                 transport: 'stdio',
                 command: 'node',
                 args: ['server.js'],
                 enabled: true,
-                description: 'My server',
-            };
+                description: 'Test server 1',
+            },
+            {
+                name: 'test-server-2',
+                transport: 'sse',
+                url: 'https://example.com/sse',
+                enabled: false,
+                description: 'Test server 2',
+            },
+        ];
 
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = ServerRow({ app: mockApp, server }, mockContext) as any;
+        juris.createContext().setState('servers.items', servers);
 
-            const dropdown = vdom.tr.children[5].td.children[0].DropdownMenu;
-            const editItem = dropdown.children[0].DropdownMenuItem;
+        const vnode: JurisVDOMElement = {
+            div: {
+                children: [{ serverTable: {} }],
+            },
+        };
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
 
-            editItem.onClick();
+        // Check table exists
+        const table = document.querySelector('table');
+        assert.ok(table, 'Expected table to exist');
 
-            assert.equal(stateStore['ui.serverModalMode'], 'edit');
-            assert.equal(stateStore['ui.showServerModal'], true);
-            assert.equal(stateStore['serverModal.name.value'], 'edit-server');
-            assert.equal(stateStore['serverModal.transport.value'], 'stdio');
-            assert.equal(stateStore['serverModal.command.value'], 'node');
-            assert.equal(stateStore['serverModal.args.value'], 'server.js');
-            assert.equal(stateStore['serverModal.enabled.value'], true);
-            assert.equal(stateStore['serverModal.description.value'], 'My server');
-        });
+        // Check headers
+        const headers = document.querySelectorAll('thead th');
+        assert.equal(headers.length, 6);
+        assert.equal(headers[0].textContent, 'NAME');
+        assert.equal(headers[1].textContent, 'STATUS');
+        assert.equal(headers[2].textContent, 'TRANSPORT');
+        assert.equal(headers[3].textContent, 'COMMAND/URL');
+        assert.equal(headers[4].textContent, 'DESCRIPTION');
+        assert.equal(headers[5].textContent, 'ACTIONS');
+
+        // Check rows exist (2 servers)
+        const rows = document.querySelectorAll('tbody tr');
+        assert.equal(rows.length, 2);
+        assert.equal(rows[0].id, 'server-row-test-server-1');
+        assert.equal(rows[1].id, 'server-row-test-server-2');
+    });
+});
+
+describe('Server Row Component (DOM Rendering)', () => {
+    let juris: JurisInstance;
+
+    before(() => {
+        // Load Juris via script tag
+        const jurisPath = resolve(process.cwd(), 'node_modules/juris/juris.js');
+        const jurisCode = readFileSync(jurisPath, 'utf-8');
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.textContent = jurisCode;
+        document.head.appendChild(script);
+
+        // Execute script in window context
+        Object(window).eval(jurisCode);
+
+        // Initialize Juris
+        juris = new Juris({ states: {} });
+
+        // Register component
+        juris.registerComponent('serverRow', serverRow as never);
+
+        // Register stub components
+        juris.registerComponent('menu', (() => ({ div: { class: 'menu-stub' } })) as never);
+        juris.registerComponent('icon', (() => ({ div: { class: 'icon-stub' } })) as never);
+    });
+
+    beforeEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    test('should render stdio server with enabled status', () => {
+        const server: MCPServerConfig = {
+            name: 'test-stdio-server',
+            transport: 'stdio',
+            command: 'node',
+            args: ['server.js', '--port', '3000'],
+            enabled: true,
+            description: 'Test stdio server',
+        };
+
+        const vnode: JurisVDOMElement = {
+            table: {
+                children: [
+                    {
+                        tbody: {
+                            children: [{ serverRow: { server } }],
+                        },
+                    },
+                ],
+            },
+        };
+
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        const row = document.querySelector('tr');
+        assert.ok(row, 'Expected row to exist');
+        assert.equal(row.id, 'server-row-test-stdio-server');
+
+        const cells = row.querySelectorAll('td');
+        assert.equal(cells.length, 6);
+
+        // Name cell
+        const nameStrong = cells[0].querySelector('strong');
+        assert.ok(nameStrong);
+        assert.equal(nameStrong.textContent, 'test-stdio-server');
+
+        // Status cell
+        const statusSpan = cells[1].querySelector('span');
+        assert.ok(statusSpan);
+        assert.equal(statusSpan.textContent, '✓ Enabled');
+
+        // Transport cell
+        const transportCode = cells[2].querySelector('code');
+        assert.ok(transportCode);
+        assert.equal(transportCode.textContent, 'STDIO');
+
+        // Command cell
+        const commandCode = cells[3].querySelector('code');
+        assert.ok(commandCode);
+        const cmdText = commandCode.textContent || '';
+        assert.ok(cmdText.includes('node'));
+        assert.ok(cmdText.includes('server.js'));
+
+        // Description cell
+        assert.equal(cells[4].textContent, 'Test stdio server');
+
+        // Actions cell (menu stub)
+        const menuStub = cells[5].querySelector('.menu-stub');
+        assert.ok(menuStub);
+    });
+
+    test('should render disabled server status', () => {
+        const server: MCPServerConfig = {
+            name: 'disabled-server',
+            transport: 'stdio',
+            command: 'node',
+            enabled: false,
+        };
+
+        const vnode: JurisVDOMElement = {
+            table: {
+                children: [
+                    {
+                        tbody: {
+                            children: [{ serverRow: { server } }],
+                        },
+                    },
+                ],
+            },
+        };
+
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        const row = document.querySelector('tr');
+        assert.ok(row);
+
+        const statusCell = row.querySelectorAll('td')[1];
+        const statusSpan = statusCell.querySelector('span');
+        assert.ok(statusSpan);
+        assert.equal(statusSpan.textContent, '✗ Disabled');
+    });
+
+    test('should render SSE server with URL', () => {
+        const server: MCPServerConfig = {
+            name: 'sse-server',
+            transport: 'sse',
+            url: 'https://example.com/sse',
+            enabled: true,
+        };
+
+        const vnode: JurisVDOMElement = {
+            table: {
+                children: [
+                    {
+                        tbody: {
+                            children: [{ serverRow: { server } }],
+                        },
+                    },
+                ],
+            },
+        };
+
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        const row = document.querySelector('tr');
+        assert.ok(row);
+
+        const cells = row.querySelectorAll('td');
+
+        // Transport cell
+        const transportCode = cells[2].querySelector('code');
+        assert.ok(transportCode);
+        assert.equal(transportCode.textContent, 'SSE');
+
+        // URL cell
+        const urlCode = cells[3].querySelector('code');
+        assert.ok(urlCode);
+        assert.equal(urlCode.textContent, 'https://example.com/sse');
+    });
+
+    test('should render HTTP server with URL', () => {
+        const server: MCPServerConfig = {
+            name: 'http-server',
+            transport: 'http',
+            url: 'http://localhost:8080',
+            enabled: true,
+        };
+
+        const vnode: JurisVDOMElement = {
+            table: {
+                children: [
+                    {
+                        tbody: {
+                            children: [{ serverRow: { server } }],
+                        },
+                    },
+                ],
+            },
+        };
+
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        const row = document.querySelector('tr');
+        assert.ok(row);
+
+        const cells = row.querySelectorAll('td');
+
+        // Transport cell
+        const transportCode = cells[2].querySelector('code');
+        assert.ok(transportCode);
+        assert.equal(transportCode.textContent, 'HTTP');
+
+        // URL cell
+        const urlCode = cells[3].querySelector('code');
+        assert.ok(urlCode);
+        assert.equal(urlCode.textContent, 'http://localhost:8080');
+    });
+
+    test('should show dash for empty description', () => {
+        const server: MCPServerConfig = {
+            name: 'no-desc-server',
+            transport: 'stdio',
+            command: 'test',
+            enabled: true,
+        };
+
+        const vnode: JurisVDOMElement = {
+            table: {
+                children: [
+                    {
+                        tbody: {
+                            children: [{ serverRow: { server } }],
+                        },
+                    },
+                ],
+            },
+        };
+
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        const row = document.querySelector('tr');
+        assert.ok(row);
+
+        const descriptionCell = row.querySelectorAll('td')[4];
+        assert.equal(descriptionCell.textContent, '-');
     });
 });

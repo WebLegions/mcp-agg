@@ -160,9 +160,7 @@ async function benchOurValidatorReused() {
     };
 }
 
-async function benchZodReused() {
-    const z = await import('zod').then((m) => m.z);
-
+async function benchZodReused(z) {
     // Create schema once
     const schema = z.object({
         id: z.number(),
@@ -277,9 +275,7 @@ async function benchOurValidatorCreateOnce() {
     };
 }
 
-async function benchZodCreateOnce() {
-    const z = await import('zod').then((m) => m.z);
-
+async function benchZodCreateOnce(z) {
     const testData = Array.from({ length: ITERATIONS_ONCE }, (_, i) => generateUser(i));
 
     if (global.gc) global.gc();
@@ -378,9 +374,7 @@ async function benchOurValidatorSimple() {
     };
 }
 
-async function benchZodSimple() {
-    const z = await import('zod').then((m) => m.z);
-
+async function benchZodSimple(z) {
     const schema = z.object({
         name: z.string(),
         age: z.number().min(0),
@@ -468,9 +462,7 @@ async function benchOurValidatorArray() {
     };
 }
 
-async function benchZodArray() {
-    const z = await import('zod').then((m) => m.z);
-
+async function benchZodArray(z) {
     const schema = z.object({
         users: z.array(
             z.object({
@@ -526,6 +518,17 @@ async function main() {
     console.error('TODO: Rewrite to use the current Fastify validator implementation.');
     process.exit(1);
 
+    // Check if zod is installed
+    let z;
+    try {
+        z = await import('zod').then((m) => m.z);
+    } catch (_err) {
+        console.error('ERROR: zod is not installed.');
+        console.error('For this benchmark to run, you need to manually install the library under test.');
+        console.error('Use: bun install zod');
+        process.exit(1);
+    }
+
     const os = await import('node:os');
 
     if (typeof global.gc !== 'function') {
@@ -555,7 +558,7 @@ async function main() {
     console.log('✓ Complete:', ourSimple);
 
     console.log('Testing Zod...');
-    const zodSimple = await benchZodSimple();
+    const zodSimple = await benchZodSimple(z);
     console.log('✓ Complete:', zodSimple);
 
     results.push({ test: 'Validator (simple, reused)', ...ourSimple }, { test: 'Zod4 (simple, reused)', ...zodSimple });
@@ -569,7 +572,7 @@ async function main() {
     console.log('✓ Complete:', ourReused);
 
     console.log('Testing Zod...');
-    const zodReused = await benchZodReused();
+    const zodReused = await benchZodReused(z);
     console.log('✓ Complete:', zodReused);
 
     results.push({ test: 'Validator (complex, reused)', ...ourReused }, { test: 'Zod4 (complex, reused)', ...zodReused });
@@ -583,7 +586,7 @@ async function main() {
     console.log('✓ Complete:', ourOnce);
 
     console.log('Testing Zod...');
-    const zodOnce = await benchZodCreateOnce();
+    const zodOnce = await benchZodCreateOnce(z);
     console.log('✓ Complete:', zodOnce);
 
     results.push({ test: 'Validator (create once)', ...ourOnce }, { test: 'Zod4 (create once)', ...zodOnce });
@@ -597,7 +600,7 @@ async function main() {
     console.log('✓ Complete:', ourArray);
 
     console.log('Testing Zod...');
-    const zodArray = await benchZodArray();
+    const zodArray = await benchZodArray(z);
     console.log('✓ Complete:', zodArray);
 
     results.push({ test: 'Validator (array)', ...ourArray }, { test: 'Zod4 (array)', ...zodArray });

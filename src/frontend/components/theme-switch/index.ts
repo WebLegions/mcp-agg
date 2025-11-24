@@ -4,7 +4,8 @@
  * Juris VDOM component for toggling between light and dark themes
  */
 
-import type { ExtendedStyleObject, JurisContext, JurisInstance, JurisVDOMElement } from '../../types/juris';
+import type { AppComponent } from '../../main';
+import type { StyleObject } from '../../types/juris';
 import { themeSunMoonIcon } from '../icon';
 
 const THEME_KEY = 'theme';
@@ -52,7 +53,7 @@ function toggleTheme(): 'dark' | 'light' {
 /**
  * Theme Switch Component
  */
-export function ThemeSwitch(_props: Record<string, never>, _ctx: JurisContext): JurisVDOMElement {
+export const themeSwitch: AppComponent = (_props, _ctx) => {
     const currentTheme = getThemePreference();
     const isDark = currentTheme === 'dark';
 
@@ -62,7 +63,7 @@ export function ThemeSwitch(_props: Record<string, never>, _ctx: JurisContext): 
     }
 
     // CSSExtractor Styles using classless theme CSS variables
-    const style: ExtendedStyleObject = {
+    const style: StyleObject = {
         // Container styles
         width: '38px',
         height: '24px',
@@ -215,7 +216,11 @@ export function ThemeSwitch(_props: Record<string, never>, _ctx: JurisContext): 
                             {
                                 div: {
                                     class: 'thumb',
-                                    children: [themeSunMoonIcon],
+                                    children: [
+                                        {
+                                            svg: themeSunMoonIcon,
+                                        },
+                                    ],
                                 },
                             },
                         ],
@@ -224,11 +229,13 @@ export function ThemeSwitch(_props: Record<string, never>, _ctx: JurisContext): 
             ],
         },
     };
-}
+};
 
-/**
- * Register ThemeSwitch component with Juris
- */
-export function registerThemeSwitch(juris: JurisInstance): void {
-    juris.registerComponent('ThemeSwitch', ThemeSwitch);
+// Register component in App.Components namespace for better type inference
+declare global {
+    namespace App {
+        interface Components {
+            themeSwitch: Record<string, never>;
+        }
+    }
 }

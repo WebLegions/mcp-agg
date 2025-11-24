@@ -24,15 +24,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Code assumes Bun >= 1.03 with Node.js API >= v24 (see package.json engine field). Always prefer to use latest native APIs.
 - tsconfig: Module=ESNext; Resolution=bundler; Strict mode; Source maps enabled for better debugging. always noEmit.
 - Do not use imports from "bun:*" namespaces and Bun-specific globals. We keep strict adherence with Node.js >=24 APIs for backwards compatibility of the project codebase.
-- Never use `null` in the code >> use `undefined` instead.
-- Never use `any` in the code >> use `unknown` instead.
+- Never use `null` in the code >>> use `undefined` instead.
+- Never use `any` in the code >>> use `unknown` instead. Addtional patterns to replace any:
+  - `(window as any).getVar()` >>> `Object(window).getVar()`
+  - `mockFetch as any` >>> `mockFetch as never`
+  - `function x(props: any)` >>> `function x(props: Record<string,unknown>)`
+- Never use 'eval' in the code >>> use 'new Function' instead.
 - Use type validations and schemas from the Validator internal (instead of TypeBox or Zod).
 - Use plain console.log/error for logging in code. Use Logger from src/util for scoped logger.
 - File naming uses kebab-case convention (e.g., run-tests.ts, not run_tests.ts)
 - Initializing object with defaults: follow the pattern as in src\lib\cluster\cluster-manager.ts
 - Class, variable and property naming should be concise and short! For example:
-   `const valueValidator: Validator = Validator.get(x);` >>>> `const val = Validator.get(x);`
-   `private _validatorProperties: ValidatorProperties;` >>>> `private _props: ValidatorProperties`
+   `const valueValidator: Validator = Validator.get(x);` >>> `const val = Validator.get(x);`
+   `private _validatorProperties: ValidatorProperties;` >>> `private _props: ValidatorProperties`
    `class ValidatorPropertiesConfig` >>> `class Config`
 - When adding code write the code adhering to proper TypeScript (tsc compilation is a required step - see below) using the standards set in biome.config. Write it clean to begin with, so we don't need a cycle of code fixing later.
 - Before completing a task, the code needs to be "clean" from errors (use `bun run test:verbose` to make sure all code and tests are passing.)

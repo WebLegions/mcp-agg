@@ -30,7 +30,6 @@
 // biome-ignore-all lint/style/useNamingConvention: external json schema naming
 import os from 'node:os';
 import { performance } from 'node:perf_hooks';
-import fastJsonStringify from 'fast-json-stringify';
 
 const DEFAULT_N = 10_000;
 const N = Number.parseInt(process.argv[2], 10) || DEFAULT_N;
@@ -159,9 +158,10 @@ function benchJsonStringify(data: unknown, iterations: number): BenchResult {
 }
 
 // Benchmark fast-json-stringify (Fastify's compiled serializer)
-function benchFastJsonStringify(data: unknown, iterations: number): BenchResult {
+function benchFastJsonStringify(data: unknown, iterations: number, fastJsonStringify: unknown): BenchResult {
     // Pre-compile the stringify function (this happens once)
-    const stringify = fastJsonStringify(collectionSchema);
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic import
+    const stringify = (fastJsonStringify as any)(collectionSchema);
 
     const t0 = performance.now();
     const mem0 = process.memoryUsage().heapUsed;
@@ -226,8 +226,9 @@ function benchRoundTrip(data: unknown, iterations: number): BenchResult {
 }
 
 // Benchmark fast-json-stringify + JSON.parse
-function benchFastStringifyParse(data: unknown, iterations: number): BenchResult {
-    const stringify = fastJsonStringify(collectionSchema);
+function benchFastStringifyParse(data: unknown, iterations: number, fastJsonStringify: unknown): BenchResult {
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic import
+    const stringify = (fastJsonStringify as any)(collectionSchema);
 
     const t0 = performance.now();
     const mem0 = process.memoryUsage().heapUsed;
@@ -264,6 +265,18 @@ async function main() {
         process.exit(1);
     }
 
+    // Check if fast-json-stringify is installed
+    let fastJsonStringify: unknown;
+    try {
+        const module = await import('fast-json-stringify');
+        fastJsonStringify = module.default;
+    } catch (_err) {
+        console.error('ERROR: fast-json-stringify is not installed.');
+        console.error('For this benchmark to run, you need to manually install the library under test.');
+        console.error('Use: bun install fast-json-stringify');
+        process.exit(1);
+    }
+
     console.log('Generating test data...');
     const testData = generateTestData(N);
     const jsonString = JSON.stringify(testData);
@@ -283,7 +296,8 @@ async function main() {
     // Warmup runs to stabilize JIT
     JSON.stringify(testData);
     JSON.parse(jsonString);
-    const fastStringify = fastJsonStringify(collectionSchema);
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic import
+    const fastStringify = (fastJsonStringify as any)(collectionSchema);
     fastStringify(testData);
     console.log('Warmup complete');
 
@@ -298,7 +312,7 @@ async function main() {
 
     await runGC();
     console.log('Testing fast-json-stringify (Fastify)...');
-    results['Stringify: fast-json-stringify'] = benchFastJsonStringify(testData, ITERATIONS);
+    results['Stringify: fast-json-stringify'] = benchFastJsonStringify(testData, ITERATIONS, fastJsonStringify);
 
     console.log('\n=== PARSE Benchmarks (JSON String → Object) ===');
 
@@ -314,7 +328,7 @@ async function main() {
 
     await runGC();
     console.log('Testing fast-json-stringify + JSON.parse...');
-    results['Round-trip: fast-json + Bun parse'] = benchFastStringifyParse(testData, ITERATIONS);
+    results['Round-trip: fast-json + Bun parse'] = benchFastStringifyParse(testData, ITERATIONS, fastJsonStringify);
 
     console.log('\n=== Results ===');
     console.table(

@@ -1,5 +1,5 @@
 /**
- * Icon definitions as Juris VDOM elements.
+ * icon definitions as Juris VDOM elements.
  * Centralized location for all SVG icons used in the application.
  * Icons sourced from https://lucide.dev/icons/
  * Search >> Select Stroke width 1px; Size 24px; >> [Copy SVG]
@@ -13,21 +13,25 @@
  * Now ask your Viber to convert it to JurisVDOMElement. Some examples below.
  */
 
-import type { JurisVDOMElement } from '../../types/juris';
+import type { JurisVDOM, SVGProperties } from '../../types/juris';
 
-function svgWrapper(children: JurisVDOMElement[]) {
+export interface IconDefinition extends SVGProperties {
+    class?: string;
+    viewBox?: string;
+    children?: JurisVDOM.Element[];
+    [key: string]: unknown;
+}
+
+function svgWrapper(children: JurisVDOM.Element[]): IconDefinition {
     return {
-        svg: {
-            class: 'svg',
-            viewBox: '0 0 24 24',
-            fill: 'none',
-            stroke: 'currentColor',
-            'stroke-width': '1',
-            'stroke-linecap': 'round',
-            'stroke-linejoin': 'round',
-            xmlns: 'http://www.w3.org/2000/svg',
-            children,
-        },
+        class: 'svg',
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        children,
     };
 }
 
@@ -163,67 +167,64 @@ export const duplicateIcon = svgWrapper([
  * Sun and moon theme toggle icon
  * Contains sun rays (light mode) and moon crescent path (dark mode)
  */
-export const themeSunMoonIcon: JurisVDOMElement = {
-    svg: {
-        class: 'theme-icon',
-        viewBox: '0 0 12 12',
-        xmlns: 'http://www.w3.org/2000/svg',
-        children: [
-            // Sun rays (4 lines)
-            {
-                line: {
-                    class: 'sun-ray',
-                    x1: '6',
-                    y1: '0',
-                    x2: '6',
-                    y2: '12',
-                    stroke: 'currentColor',
-                    'stroke-width': '1',
-                },
+export const themeSunMoonIcon: IconDefinition = {
+    class: 'theme-icon',
+    viewBox: '0 0 12 12',
+    children: [
+        // Sun rays (4 lines)
+        {
+            line: {
+                class: 'sun-ray',
+                x1: '6',
+                y1: '0',
+                x2: '6',
+                y2: '12',
+                stroke: 'currentColor',
+                'stroke-width': '1',
             },
-            {
-                line: {
-                    class: 'sun-ray',
-                    x1: '0',
-                    y1: '6',
-                    x2: '12',
-                    y2: '6',
-                    stroke: 'currentColor',
-                    'stroke-width': '1',
-                },
+        },
+        {
+            line: {
+                class: 'sun-ray',
+                x1: '0',
+                y1: '6',
+                x2: '12',
+                y2: '6',
+                stroke: 'currentColor',
+                'stroke-width': '1',
             },
-            {
-                line: {
-                    class: 'sun-ray',
-                    x1: '1.76',
-                    y1: '1.76',
-                    x2: '10.24',
-                    y2: '10.24',
-                    stroke: 'currentColor',
-                    'stroke-width': '1',
-                },
+        },
+        {
+            line: {
+                class: 'sun-ray',
+                x1: '1.76',
+                y1: '1.76',
+                x2: '10.24',
+                y2: '10.24',
+                stroke: 'currentColor',
+                'stroke-width': '1',
             },
-            {
-                line: {
-                    class: 'sun-ray',
-                    x1: '10.24',
-                    y1: '1.76',
-                    x2: '1.76',
-                    y2: '10.24',
-                    stroke: 'currentColor',
-                    'stroke-width': '1',
-                },
+        },
+        {
+            line: {
+                class: 'sun-ray',
+                x1: '10.24',
+                y1: '1.76',
+                x2: '1.76',
+                y2: '10.24',
+                stroke: 'currentColor',
+                'stroke-width': '1',
             },
-            // Moon path (scaled and centered for 12x12 viewBox)
-            {
-                path: {
-                    d: 'M10.493 6.243a4.5 4.5 0 1 1-4.736-4.736c.202-.011.308.23.201.401a3 3 0 0 0 4.134 4.134c.172-.107.412-.002.401.201',
-                    class: 'moon',
-                    stroke: 'currentColor',
-                    'stroke-width': '0.5',
-                    fill: 'none',
-                },
+        },
+        // Moon path (scaled and centered for 12x12 viewBox)
+        {
+            path: {
+                d: 'M10.493 6.243a4.5 4.5 0 1 1-4.736-4.736c.202-.011.308.23.201.401a3 3 0 0 0 4.134 4.134c.172-.107.412-.002.401.201',
+                class: 'moon',
+                stroke: 'currentColor',
+                'stroke-width': '0.5',
+                fill: 'none',
             },
-        ],
-    },
+        },
+    ],
 };

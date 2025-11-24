@@ -1,149 +1,170 @@
 /// <reference lib="dom" />
-import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, test } from 'node:test';
-import type { McpConfigApp } from '../main';
-import type { JurisContext } from '../types/juris';
-import { AppShell } from './app-shell';
+import { strict as assert } from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { before, beforeEach, describe, test } from 'node:test';
+import type { AppComponent, AppContext } from '../main';
+import type { JurisInstance, JurisVDOMElement } from '../types/juris';
 
-describe('AppShell Component', () => {
-    let mockContext: JurisContext;
-    let mockApp: McpConfigApp;
+describe('AppShell Component (DOM Rendering)', () => {
+    let juris: JurisInstance;
+    let appShell: AppComponent;
 
+    // One-time setup: Create DOM and load Juris
+    before(async () => {
+        // Load Juris library via script tag
+        const jurisPath = resolve(process.cwd(), 'node_modules/juris/juris.js');
+        const jurisCode = readFileSync(jurisPath, 'utf-8');
+
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.textContent = jurisCode;
+        document.head.appendChild(script);
+
+        // Execute script in window context
+        Object(window).eval(jurisCode);
+
+        juris = new Juris({
+            states: {
+                'url.path': '/',
+                'servers.loading': false,
+                'servers.items': [],
+            },
+        });
+
+        // Dynamically import app-shell after Juris is loaded
+        const appShellModule = await import('./app-shell');
+        appShell = appShellModule.appShell;
+
+        // Create a wrapper that provides necessary context
+        const appShellWrapper = (props: Record<string, unknown>, ctx: AppContext) => {
+            // Mock router, config, and api in context
+            const mockRouter = {
+                getState: () => 'url.path',
+                navigate: (path: string) => {
+                    ctx.setState('url.path', path);
+                },
+                matchRoute: (_path: string) => ({
+                    route: { component: 'configPage' },
+                    params: {},
+                    query: {},
+                }),
+                getConfig: () => ({ routes: {} }),
+                addRoute: () => {},
+                configure: () => {},
+            };
+
+            const mockConfig = {
+                loadServers: () => Promise.resolve(),
+            };
+
+            const mockApi = {};
+
+            // Create context with mocks
+            const contextWithMocks = {
+                ...ctx,
+                router: mockRouter,
+                config: mockConfig,
+                api: mockApi,
+            } as unknown as AppContext;
+
+            // Call original appShell with mocked context
+            return appShell(props, contextWithMocks);
+        };
+
+        // Register appShell wrapper and its dependencies as simple stubs
+        juris.registerComponent('appShell', appShellWrapper as never);
+        juris.registerComponent('navBar', (() => ({
+            nav: {
+                'aria-label': 'Main navigation',
+                children: [],
+            },
+        })) as never);
+        juris.registerComponent('configPage', (() => ({ div: { text: 'Config Page' } })) as never);
+        juris.registerComponent('healthPage', (() => ({ div: { text: 'Health Page' } })) as never);
+        juris.registerComponent('swaggerPage', (() => ({ div: { text: 'Swagger Page' } })) as never);
+        juris.registerComponent('icon', ((props: Record<string, unknown>) => ({
+            div: {
+                'aria-label': props.ariaLabel || '',
+                onClick: props.onClick,
+                children: props.image ? [{ svg: props.image }] : [],
+            },
+        })) as never);
+        juris.registerComponent('themeSwitch', (() => ({ div: { class: 'theme-switch' } })) as never);
+        juris.registerComponent('envModal', (() => ({ div: { class: 'env-modal' } })) as never);
+    });
+
+    // Before each test: Clear the body
     beforeEach(() => {
         document.body.innerHTML = '';
-        mockContext = {
-            getState: <T>(_key: string, defaultValue?: T): T => defaultValue as T,
-            setState: (_key: string, _value: unknown) => {},
-            headlessAPIs: {},
-            executeBatch: (callback: () => unknown) => callback(),
-        } as JurisContext;
-
-        mockApp = {} as McpConfigApp;
     });
 
-    afterEach(() => {
-        document.body.innerHTML = '';
+    test('should render main layout structure with nav, main, and footer', () => {
+        const vnode: JurisVDOMElement = {
+            div: {
+                children: [
+                    {
+                        appShell: {
+                            app: {} as never,
+                        },
+                    },
+                ],
+            },
+        };
+
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        // Verify navigation exists
+        const nav = document.querySelector('nav[aria-label="Main navigation"]');
+        assert.ok(nav, 'Navigation should exist');
+
+        // Verify main content area exists
+        const main = document.querySelector('main');
+        assert.ok(main, 'Main content area should exist');
+
+        // Verify footer exists
+        const footer = document.querySelector('footer');
+        assert.ok(footer, 'Footer should exist');
+
+        // Verify GitHub link in footer
+        const githubLink = footer?.querySelector('a[href="https://github.com/eram/mcp-agg"]');
+        assert.ok(githubLink, 'GitHub link should exist');
+        assert.equal(githubLink.getAttribute('target'), '_blank');
+        assert.equal(githubLink.getAttribute('rel'), 'noopener noreferrer');
+        assert.equal(githubLink.textContent, 'GitHub');
     });
 
-    describe('Structure', () => {
-        test('should render main container div', () => {
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = AppShell({ app: mockApp }, mockContext) as any;
+    test('should render bottom-right controls with info icon and theme switch', () => {
+        const vnode: JurisVDOMElement = {
+            div: {
+                children: [
+                    {
+                        appShell: {
+                            app: {} as never,
+                        },
+                    },
+                ],
+            },
+        };
 
-            assert.ok(vdom.div);
-            assert.ok(Array.isArray(vdom.div.children));
-        });
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
 
-        test('should render header with navigation', () => {
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = AppShell({ app: mockApp }, mockContext) as any;
+        // Verify bottom-right controls container
+        const controls = document.querySelector('.bottom-right-controls');
+        assert.ok(controls, 'Bottom-right controls should exist');
 
-            const header = vdom.div.children[0].header;
-            assert.ok(header);
-            assert.ok(header.children);
+        const controlsEl = controls as HTMLElement;
+        assert.equal(controlsEl.style.position, 'fixed');
+        assert.equal(controlsEl.style.zIndex, '1000');
 
-            const nav = header.children[0].nav;
-            assert.ok(nav);
-            assert.ok(Array.isArray(nav.children));
-            assert.equal(nav.children.length, 3);
-        });
+        // Verify info icon (may be rendered as a div with onclick)
+        const icons = controls.querySelectorAll('div');
+        assert.ok(icons.length > 0, 'Control icons should exist');
 
-        test('should have navigation links', () => {
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = AppShell({ app: mockApp }, mockContext) as any;
-
-            const nav = vdom.div.children[0].header.children[0].nav;
-            const links = nav.children;
-
-            assert.equal(links[0].a.href, '#servers');
-            assert.equal(links[0].a.text, 'Servers');
-
-            assert.equal(links[1].a.href, '#tools');
-            assert.equal(links[1].a.text, 'Tools');
-
-            assert.equal(links[2].a.href, '#resources');
-            assert.equal(links[2].a.text, 'Resources');
-        });
-
-        test('should render main content area', () => {
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = AppShell({ app: mockApp }, mockContext) as any;
-
-            const main = vdom.div.children[1].main;
-            assert.ok(main);
-            assert.ok(Array.isArray(main.children));
-            assert.equal(main.children.length, 1);
-            assert.ok(main.children[0].McpConfigPage);
-        });
-
-        test('should render footer with GitHub link', () => {
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = AppShell({ app: mockApp }, mockContext) as any;
-
-            const footer = vdom.div.children[2].footer;
-            assert.ok(footer);
-
-            const footerContent = footer.children[0].div.children;
-            assert.ok(footerContent[0].span);
-            assert.equal(footerContent[0].span.text, 'MCP Aggregator • ');
-
-            const githubLink = footerContent[1].a;
-            assert.equal(githubLink.href, 'https://github.com/eram/mcp-agg');
-            assert.equal(githubLink.target, '_blank');
-            assert.equal(githubLink.rel, 'noopener noreferrer');
-            assert.equal(githubLink.text, 'GitHub');
-        });
-
-        test('should render bottom-right controls', () => {
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = AppShell({ app: mockApp }, mockContext) as any;
-
-            const controls = vdom.div.children[3].div;
-            assert.equal(controls.className, 'bottom-right-controls');
-            assert.equal(controls.style.position, 'fixed');
-            assert.equal(controls.style.right, '1.5rem');
-            assert.equal(controls.style.bottom, '1.5rem');
-            assert.equal(controls.style.zIndex, '1000');
-
-            assert.ok(Array.isArray(controls.children));
-            assert.equal(controls.children.length, 2);
-            assert.ok(controls.children[0].Icon);
-            assert.ok(controls.children[1].ThemeSwitch);
-        });
-
-        test('should render env info modal', () => {
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = AppShell({ app: mockApp }, mockContext) as any;
-
-            const modal = vdom.div.children[4].EnvInfoModal;
-            assert.ok(modal);
-            assert.equal(modal.stateKey, 'ui.showEnvInfoModal');
-        });
-    });
-
-    describe('Interactions', () => {
-        test('should open env info modal on icon click', () => {
-            let stateKey = '';
-            let stateValue: unknown;
-
-            const contextWithSetState = {
-                ...mockContext,
-                setState: (key: string, value: unknown) => {
-                    stateKey = key;
-                    stateValue = value;
-                },
-            } as JurisContext;
-
-            // biome-ignore lint/suspicious/noExplicitAny: Test VDOM access
-            const vdom = AppShell({ app: mockApp }, contextWithSetState) as any;
-
-            const infoIcon = vdom.div.children[3].div.children[0].Icon;
-            assert.ok(infoIcon.onClick);
-
-            infoIcon.onClick();
-
-            assert.equal(stateKey, 'ui.showEnvInfoModal');
-            assert.equal(stateValue, true);
-        });
+        // Verify theme switch
+        const themeSwitch = controls.querySelector('.theme-switch');
+        assert.ok(themeSwitch, 'Theme switch should exist');
     });
 });

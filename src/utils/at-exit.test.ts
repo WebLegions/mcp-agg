@@ -1,14 +1,14 @@
 import { strictEqual } from 'node:assert/strict';
 import { describe, mock, test } from 'node:test';
 import { sleep } from '../shared/utils/time';
-import { atExit } from './at-exit';
+import { type AtExit, atExit } from './at-exit';
 
 // NB!!!
 // Skip these tests in batch mode - they emit SIGINT signals that interfere with test runner
 // you can run it manually to test the functionality.
 describe.skip('atExit', () => {
     test('remove removes a callback', () => {
-        const cb = mock.fn();
+        const cb = mock.fn() as never as AtExit;
         const remove = atExit(cb);
         strictEqual(remove(), true);
         strictEqual(remove(), false);

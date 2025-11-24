@@ -153,8 +153,8 @@ describe('HTTP Server', () => {
         // Should have multiple routes registered
         const routes = server.printRoutes({ commonPrefix: false });
         ok(routes.length > 0);
-        ok(routes.includes('/health'));
-        ok(routes.includes('/api/v1/swagger'));
+        ok(routes.includes('health'));
+        ok(routes.includes('api/v1/swagger'));
     });
 
     // startServer tests

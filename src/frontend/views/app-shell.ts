@@ -1,56 +1,78 @@
-import { infoIcon, registerIcon } from '../components/icon';
-import type { McpConfigApp } from '../main';
-import type { JurisContext, JurisInstance, JurisVDOMElement } from '../types/juris';
-import { registerEnvInfoModal } from './env-info-modal';
+import { ErrorEx } from '../../shared/utils/error';
+import { menu } from '../components/dropdown-menu';
+import { icon, infoIcon } from '../components/icon';
+import { modal } from '../components/modal';
+import { type NavRoute, navBar } from '../components/nav-bar';
+import { themeSwitch } from '../components/theme-switch';
+import { type App, type AppComponent, v } from '../main';
+import { configPage } from './config-page';
+import { envModal } from './env-modal';
+import { healthPage } from './health-page';
+import { serverModal } from './server-modal';
+import { serverRow, serverTable } from './server-table';
+import { swaggerPage } from './swagger-page';
 
-type AppShellProps = {
-    app: McpConfigApp;
-};
+/**
+ * Shared route configuration
+ * Single source of truth for both router and navigation
+ */
+interface RouteConfig extends NavRoute {
+    component: string;
+}
+
+const APP_ROUTES: RouteConfig[] = [
+    { path: '/', label: 'MCP Config', component: 'configPage' },
+    { path: '/health', label: 'Health', component: 'healthPage' },
+    { path: '/swagger', label: 'Swagger', component: 'swaggerPage' },
+];
 
 /**
  * Main application shell with header, navigation, and footer
  * Wraps the main content area with persistent UI elements
+ * Handles router initialization and app bootstrap
  */
-export function AppShell(_props: AppShellProps, ctx: JurisContext): JurisVDOMElement {
+export const appShell: AppComponent = (_props, ctx) => {
+    // Access router and config
+    const router = ctx.router;
+    const config = ctx.config;
+
+    // Validate that headless components are available
+    if (!router) {
+        throw new ErrorEx('ctx.router is required');
+    }
+    if (!config?.loadServers) {
+        console.error('Config not available. config:', config);
+        throw new ErrorEx('ctx.config is required');
+    }
+
+    const routerKey = router.getState();
+
+    // Initialize router routes and load config (only once)
+    if (!Object.keys(router.getConfig().routes ?? {}).length) {
+        // Add routes to the router
+        APP_ROUTES.forEach((route) => {
+            router.addRoute(route.path, { component: route.component });
+        });
+
+        // Async load server configurations
+        config.loadServers().catch((err: unknown) => console.error('Failed to load servers:', err));
+    }
+
     return {
         div: {
             children: [
-                // Header with navigation
-                {
-                    header: {
-                        children: [
-                            {
-                                nav: {
-                                    children: [
-                                        {
-                                            a: {
-                                                href: '#servers',
-                                                text: 'Servers',
-                                            },
-                                        },
-                                        {
-                                            a: {
-                                                href: '#tools',
-                                                text: 'Tools',
-                                            },
-                                        },
-                                        {
-                                            a: {
-                                                href: '#resources',
-                                                text: 'Resources',
-                                            },
-                                        },
-                                    ],
-                                },
-                            },
-                        ],
-                    },
-                },
+                // Navigation Bar
+                { navBar: { routes: APP_ROUTES } },
 
                 // Main content area
                 {
                     main: {
-                        children: [{ McpConfigPage: {} }],
+                        children: () => {
+                            const currentPath = ctx.getState(routerKey, '/');
+                            const match = router.matchRoute(currentPath);
+                            const name = String(match?.route?.component ?? 'configPage');
+                            return [{ [name]: {} }];
+                        },
                     },
                 },
 
@@ -68,6 +90,10 @@ export function AppShell(_props: AppShellProps, ctx: JurisContext): JurisVDOMEle
                                                 target: '_blank',
                                                 rel: 'noopener noreferrer',
                                                 text: 'GitHub',
+                                                style: {
+                                                    color: 'var(--primary-color)',
+                                                    textDecoration: 'none',
+                                                },
                                             },
                                         },
                                     ],
@@ -92,29 +118,43 @@ export function AppShell(_props: AppShellProps, ctx: JurisContext): JurisVDOMEle
                             gap: '0.5rem',
                         },
                         children: [
-                            {
-                                Icon: {
-                                    svg: infoIcon,
-                                    onClick: () => ctx.setState('ui.showEnvInfoModal', true),
-                                    ariaLabel: 'Show environment information',
-                                    title: 'Environment Info',
-                                },
-                            },
-                            { ThemeSwitch: {} },
+                            v('icon', {
+                                image: infoIcon,
+                                onClick: () => ctx.setState('ui.showEnvModal', true),
+                                ariaLabel: 'Show environment information',
+                                title: 'Environment Info',
+                            }),
+                            { themeSwitch: {} },
                         ],
                     },
                 },
-                { EnvInfoModal: { stateKey: 'ui.showEnvInfoModal' } },
+                { envModal: { stateKey: 'ui.showEnvModal' } },
             ],
         },
     };
-}
+};
 
 /**
- * Register AppShell component with Juris
+ * Register AppShell and all required components with App
+ * Consolidates all component registration in one place
  */
-export function registerAppShell(juris: JurisInstance, app: McpConfigApp) {
-    registerIcon(juris);
-    registerEnvInfoModal(juris);
-    juris.registerComponent('AppShell', (props, ctx) => AppShell({ ...props, app }, ctx));
+export function registerAppShell(app: App) {
+    const reg = [
+        icon,
+        modal,
+        menu,
+        serverTable,
+        serverRow,
+        envModal,
+        navBar,
+        appShell,
+        themeSwitch,
+        serverModal,
+        configPage,
+        healthPage,
+        swaggerPage,
+    ];
+    for (const component of reg) {
+        app.registerComponent(component.name, component as never);
+    }
 }

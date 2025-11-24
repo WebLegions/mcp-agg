@@ -18,18 +18,21 @@ export function sleep(ms: number): Promise<void> {
  * @param delay - The delay in milliseconds (default: 300).
  * @returns A debounced function.
  */
-export function debounce<T extends (...args: never[]) => void>(func: T, delay: number = 300): T {
+// biome-ignore lint/suspicious/noExplicitAny: Generic function wrapper requires any for flexibility
+export function debounce<T extends (...args: any[]) => void>(func: T, delay: number = 300): T {
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    return ((...args: Parameters<T>) => {
+    // biome-ignore lint/suspicious/noExplicitAny: Context binding requires any type
+    return function (this: any, ...args: Parameters<T>) {
         if (timeout !== undefined) {
             clearTimeout(timeout);
         }
-        timeout = globalThis.setTimeout(() => func(...args), delay);
-        // Only call unref() in Node.js environment (returns NodeJS.Timeout which has unref())
-        if (timeout && typeof (timeout as unknown as { unref?: () => void }).unref === 'function') {
-            (timeout as unknown as { unref: () => void }).unref();
+        timeout = setTimeout(() => func.apply(this, args), delay);
+
+        // call unref() in Node.js environment (returns NodeJS.Timeout which has unref())
+        if (timeout && typeof Object(timeout).unref === 'function') {
+            Object(timeout).unref();
         }
-    }) as T;
+    } as T;
 }
 
 // --- Extended DateEx and timeLocal from ts-utils/dom/time.ts ---

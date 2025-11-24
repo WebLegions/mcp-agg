@@ -1,24 +1,16 @@
 /**
  * Dropdown Menu Component
  * A flexible dropdown menu with support for nested submenus, keyboard navigation,
- * and accessibility features. Uses classless CSS framework for styling.
+ * and accessibility features. Uses inline ExtendedStyleObject for styling.
  */
 
-import type { JurisComponentFunction, JurisContext, JurisInstance, JurisVDOMElement } from '../../types/juris';
-import { loadCss } from '../../utils/helpers';
+import type { AppComponent } from '../../main';
+import type { JurisVDOMElement, StyleObject } from '../../types/juris';
+import { mergeStyles } from '../../utils/style-helpers';
 
-export interface DropdownMenuProps {
-    /** Unique ID for state management */
-    id: string;
-    /** Trigger element (button, icon, etc.) */
-    trigger: JurisVDOMElement;
-    /** Menu content items */
-    children: JurisVDOMElement[];
-    /** Alignment of dropdown relative to trigger */
-    align?: 'start' | 'end';
-}
-
-export interface DropdownMenuItemProps {
+// Individual prop interfaces for internal components
+export interface MenuItemProps {
+    type: 'item';
     /** Item text */
     text: string;
     /** Click handler */
@@ -29,29 +21,149 @@ export interface DropdownMenuItemProps {
     disabled?: boolean;
 }
 
-export interface DropdownMenuLabelProps {
+export interface MenuLabelProps {
+    type: 'label';
     /** Label text */
     text: string;
 }
 
-export interface DropdownMenuSubProps {
+export interface MenuSubProps {
+    type: 'submenu';
     /** Unique ID for submenu state */
     id: string;
     /** Trigger text */
     triggerText: string;
     /** Submenu items */
-    children: JurisVDOMElement[];
+    items: MenuItem[];
 }
+
+// Public MenuItem type composed from the prop interfaces
+export type MenuItem = MenuItemProps | { type: 'separator' } | MenuLabelProps | MenuSubProps;
+
+export interface MenuProps {
+    /** Unique ID for state management */
+    id: string;
+    /** Trigger element (button, icon, etc.) */
+    trigger: JurisVDOMElement;
+    /** Menu items as data structure */
+    items: MenuItem[];
+    /** Alignment of dropdown relative to trigger */
+    align?: 'start' | 'end';
+}
+
+/**
+ * Dropdown Menu Styles
+ */
+const styles: StyleObject = {
+    menu: {
+        position: 'relative',
+        display: 'inline-block',
+    },
+
+    trigger: {
+        cursor: 'pointer',
+    },
+
+    content: {
+        position: 'absolute',
+        top: 'calc(100% + 0.5rem)',
+        minWidth: '14rem',
+        maxWidth: '20rem',
+        padding: '0.5rem',
+        zIndex: 1000,
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        animation: 'dropdown-fade-in 0.15s ease-out',
+        '@media (prefers-color-scheme: dark)': {
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
+        },
+    },
+
+    alignStart: {
+        left: '0',
+    },
+
+    alignEnd: {
+        right: '0',
+    },
+
+    item: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '1rem',
+        padding: '0.5rem 0.75rem',
+        cursor: 'pointer',
+        borderRadius: '0.25rem',
+        transition: 'background-color 0.15s ease',
+        outline: 'none',
+        ':hover': {
+            backgroundColor: 'var(--border-color)',
+        },
+        ':focus': {
+            backgroundColor: 'var(--border-color)',
+        },
+    },
+
+    itemDisabled: {
+        opacity: 0.5,
+        cursor: 'not-allowed',
+        pointerEvents: 'none',
+    },
+
+    itemText: {
+        flex: 1,
+        whiteSpace: 'nowrap',
+    },
+
+    shortcut: {
+        opacity: 0.6,
+        fontSize: '0.75rem',
+    },
+
+    label: {
+        padding: '0.5rem 0.75rem',
+        fontWeight: 600,
+        opacity: 0.8,
+    },
+
+    separator: {
+        margin: '0.5rem 0',
+        border: 'none',
+        borderTop: '1px solid var(--border-color)',
+    },
+
+    sub: {
+        position: 'relative',
+    },
+
+    subTrigger: {
+        position: 'relative',
+    },
+
+    subArrow: {
+        marginLeft: 'auto',
+        opacity: 0.6,
+    },
+
+    subContent: {
+        position: 'absolute',
+        left: 'calc(100% + 0.25rem)',
+        top: '-0.5rem',
+        animation: 'dropdown-fade-in 0.15s ease-out',
+    },
+};
 
 /**
  * Dropdown Menu Item
  */
-export function DropdownMenuItem(props: DropdownMenuItemProps, ctx: JurisContext): JurisVDOMElement {
+const menuItem: AppComponent<MenuItemProps> = (props, ctx) => {
     const { text, onClick, shortcut, disabled } = props;
+
+    const itemStyle = disabled ? mergeStyles(styles.item, styles.itemDisabled) : styles.item;
 
     return {
         div: {
-            className: `dropdown-menu-item${disabled ? ' disabled' : ''}`,
+            style: itemStyle,
             role: 'menuitem',
             tabindex: disabled ? '-1' : '0',
             'aria-disabled': disabled ? 'true' : 'false',
@@ -63,7 +175,7 @@ export function DropdownMenuItem(props: DropdownMenuItemProps, ctx: JurisContext
             },
             onkeydown: (e: KeyboardEvent) => {
                 if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
-                    e.preventDefault(); // Corrected from e.preventDefauonClick
+                    e.preventDefault();
                     if (onClick) {
                         onClick();
                         ctx.setState('servers.menuId', '');
@@ -74,29 +186,29 @@ export function DropdownMenuItem(props: DropdownMenuItemProps, ctx: JurisContext
                 {
                     small: {
                         text,
-                        className: 'dropdown-menu-item-text',
+                        style: styles.itemText,
                     },
                 },
                 shortcut
                     ? {
                           small: {
                               text: shortcut,
-                              className: 'dropdown-menu-shortcut',
+                              style: styles.shortcut,
                           },
                       }
                     : null,
             ].filter(Boolean),
         },
     };
-}
+};
 
 /**
  * Dropdown Menu Label
  */
-export function DropdownMenuLabel(props: DropdownMenuLabelProps, _ctx: JurisContext): JurisVDOMElement {
+const menuLabel: AppComponent<MenuLabelProps> = (props, _ctx) => {
     return {
         div: {
-            className: 'dropdown-menu-label',
+            style: styles.label,
             role: 'presentation',
             children: [
                 {
@@ -107,36 +219,39 @@ export function DropdownMenuLabel(props: DropdownMenuLabelProps, _ctx: JurisCont
             ],
         },
     };
-}
+};
 
 /**
  * Dropdown Menu Separator
  */
-export function DropdownMenuSeparator(_props: Record<string, never>, _ctx: JurisContext): JurisVDOMElement {
+const menuSeparator: AppComponent = (_props, _ctx) => {
     return {
         hr: {
-            className: 'dropdown-menu-separator',
+            style: styles.separator,
             role: 'separator',
         },
     };
-}
+};
 
 /**
  * Dropdown Menu Submenu
  */
-export function DropdownMenuSub(props: DropdownMenuSubProps, ctx: JurisContext): JurisVDOMElement {
-    const { id, triggerText, children } = props;
+const menuSub: AppComponent<MenuSubProps> = (props, ctx) => {
+    const { id, triggerText, items } = props;
     const stateKey = 'servers.menuId';
     const isOpen = ctx.getState(stateKey) === id;
 
+    const subTriggerStyle = mergeStyles(styles.item, styles.subTrigger);
+    const subContentStyle = mergeStyles(styles.content, styles.subContent);
+
     return {
         div: {
-            className: 'dropdown-menu-sub',
+            style: styles.sub,
             children: [
                 // Submenu trigger
                 {
                     div: {
-                        className: 'dropdown-menu-item dropdown-menu-sub-trigger',
+                        style: subTriggerStyle,
                         role: 'menuitem',
                         tabindex: '0',
                         'aria-haspopup': 'true',
@@ -157,13 +272,13 @@ export function DropdownMenuSub(props: DropdownMenuSubProps, ctx: JurisContext):
                             {
                                 small: {
                                     text: triggerText,
-                                    className: 'dropdown-menu-item-text',
+                                    style: styles.itemText,
                                 },
                             },
                             {
                                 small: {
                                     text: '›',
-                                    className: 'dropdown-menu-sub-arrow',
+                                    style: styles.subArrow,
                                 },
                             },
                         ],
@@ -173,35 +288,58 @@ export function DropdownMenuSub(props: DropdownMenuSubProps, ctx: JurisContext):
                 isOpen
                     ? {
                           article: {
-                              className: 'dropdown-menu-content dropdown-menu-sub-content',
+                              style: subContentStyle,
                               role: 'menu',
-                              children,
+                              children: items,
                           },
                       }
                     : null,
             ].filter(Boolean),
         },
     };
-}
+};
 
 /**
  * Dropdown Menu
  */
-export function DropdownMenu(props: DropdownMenuProps, ctx: JurisContext): JurisVDOMElement {
-    const { id, trigger, children, align = 'start' } = props;
+export const menu: AppComponent<MenuProps> = (props, ctx) => {
+    const { id, trigger, items, align = 'start' } = props;
     const stateKey = 'servers.menuId';
     const isOpen = ctx.getState(stateKey) === id;
 
+    const contentStyle = mergeStyles(styles.content, align === 'start' ? styles.alignStart : styles.alignEnd);
+
+    // Helper function to render menu items from data structure
+    const renderChildren = (menuItems: MenuItem[]): JurisVDOMElement[] => {
+        return menuItems.map((item) => {
+            switch (item.type) {
+                case 'item':
+                    return menuItem(item, ctx);
+                case 'separator':
+                    return menuSeparator(item, ctx);
+                case 'label':
+                    return menuLabel(item, ctx);
+                case 'submenu':
+                    return menuSub(item, ctx);
+                default:
+                    return { div: { text: 'Unknown menu item type' } };
+            }
+        });
+    };
+
     return {
         div: {
-            className: 'dropdown-menu',
+            style: styles.menu,
             children: [
                 // Trigger
                 {
                     div: {
-                        className: 'dropdown-menu-trigger',
-                        onClick: () => {
+                        style: styles.trigger,
+                        onClick: (e: MouseEvent) => {
+                            console.log('[DropdownMenu] Trigger clicked, isOpen:', isOpen, 'id:', id);
+                            e.stopPropagation();
                             ctx.setState(stateKey, isOpen ? '' : id);
+                            console.log('[DropdownMenu] State set to:', isOpen ? '' : id);
                         },
                         children: [trigger],
                     },
@@ -210,13 +348,13 @@ export function DropdownMenu(props: DropdownMenuProps, ctx: JurisContext): Juris
                 isOpen
                     ? {
                           article: {
-                              className: `dropdown-menu-content dropdown-menu-align-${align}`,
+                              style: contentStyle,
                               role: 'menu',
                               oncreate: (vnode: { dom: HTMLElement }) => {
                                   // Click outside to close
                                   const handleClickOutside = (e: MouseEvent) => {
-                                      const dropdown = vnode.dom.closest('.dropdown-menu');
-                                      if (dropdown && !dropdown.contains(e.target as Node)) {
+                                      const menuDiv = vnode.dom.parentElement;
+                                      if (menuDiv && !menuDiv.contains(e.target as Node)) {
                                           ctx.setState(stateKey, '');
                                       }
                                   };
@@ -243,23 +381,11 @@ export function DropdownMenu(props: DropdownMenuProps, ctx: JurisContext): Juris
                                       ctx.setState(stateKey, '');
                                   }
                               },
-                              children,
+                              children: renderChildren(items),
                           },
                       }
                     : null,
             ].filter(Boolean),
         },
     };
-}
-
-/**
- * Register Dropdown Menu components with Juris
- */
-export function registerDropdownMenu(juris: JurisInstance): void {
-    loadCss('/app/components/dropdown-menu/style.css');
-    juris.registerComponent('DropdownMenu', DropdownMenu as JurisComponentFunction);
-    juris.registerComponent('DropdownMenuItem', DropdownMenuItem as JurisComponentFunction);
-    juris.registerComponent('DropdownMenuLabel', DropdownMenuLabel as JurisComponentFunction);
-    juris.registerComponent('DropdownMenuSeparator', DropdownMenuSeparator as JurisComponentFunction);
-    juris.registerComponent('DropdownMenuSub', DropdownMenuSub as JurisComponentFunction);
-}
+};

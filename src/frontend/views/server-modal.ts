@@ -7,14 +7,10 @@
 
 import { mcpHTTPServerSchema, mcpSSEServerSchema, mcpStdioServerSchema } from '../../shared/types/mcp-config';
 import { slugify } from '../../shared/utils/text';
-import { Modal } from '../components/modal';
+import { modal } from '../components/modal';
 import { extractFieldValidators, ValidatorInput } from '../components/validator-input';
-import type { McpConfigApp } from '../main';
-import type { JurisContext, JurisInstance, JurisVDOMElement } from '../types/juris';
-
-type ServerModalProps = {
-    app: McpConfigApp;
-};
+import type { AppComponent } from '../main';
+import type { JurisVDOMElement } from '../types/juris';
 
 /**
  * Get schema for specific transport type
@@ -30,8 +26,7 @@ function getSchemaForTransport(transport: string) {
     }
 }
 
-export function ServerModal(props: ServerModalProps, ctx: JurisContext): JurisVDOMElement {
-    const { app } = props;
+export const serverModal: AppComponent = (_props, ctx) => {
     const modalMode = ctx.getState<string>('serverModal.mode', 'create');
 
     // Validate form and update state
@@ -44,9 +39,6 @@ export function ServerModal(props: ServerModalProps, ctx: JurisContext): JurisVD
         ctx.setState('serverModal.validated', isValid);
         return isValid;
     };
-
-    // Initialize validation state right after the foram loads
-    // app.setState('serverModal.validated', false);
 
     // Smart auto-fill handlers
     const handleCommandBlur = (e: Event) => {
@@ -210,7 +202,7 @@ export function ServerModal(props: ServerModalProps, ctx: JurisContext): JurisVD
         }
 
         // Submit form
-        await app.saveServer();
+        await ctx.config.saveServer();
     };
 
     // Modal content: form with fields
@@ -251,7 +243,7 @@ export function ServerModal(props: ServerModalProps, ctx: JurisContext): JurisVD
     // - truthy value (e.g., true, 'show'): shown
     // - 'cancel': user clicked cancel
     // - Any other value: modal was closed
-    return Modal(
+    return modal(
         {
             id: 'server-modal',
             title: () => (ctx.getState('serverModal.mode') === 'create' ? 'Add New Server' : 'Edit Server'),
@@ -261,11 +253,4 @@ export function ServerModal(props: ServerModalProps, ctx: JurisContext): JurisVD
         },
         ctx,
     );
-}
-
-/**
- * Register ServerModal component with Juris
- */
-export function registerServerModal(juris: JurisInstance, app: McpConfigApp) {
-    juris.registerComponent('ServerModal', (props, ctx) => ServerModal({ ...props, app }, ctx));
-}
+};

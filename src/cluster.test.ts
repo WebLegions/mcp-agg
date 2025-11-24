@@ -42,14 +42,14 @@ describe.skip('Cluster', () => {
         ok(stdout.includes('started'));
     });
 
-    test.skip('forks correct number of workers', async () => {
+    test('forks correct number of workers', async () => {
         const { stdout } = await runCluster(2, 3000);
 
         ok(stdout.includes('Starting 2 workers'));
         ok(stdout.includes('Cluster mode: 2 workers active'));
     });
 
-    test.skip('starts worker processes', async () => {
+    test('starts worker processes', async () => {
         const { stdout } = await runCluster(2, 3000);
 
         ok(stdout.includes('Cluster worker'));
@@ -87,7 +87,7 @@ describe.skip('Cluster', () => {
         ok(typeof getWorkerCount === 'function');
     });
 
-    test.skip('getWorkerCount returns number when in cluster primary mode', async () => {
+    test('getWorkerCount returns number when in cluster primary mode', async () => {
         // When importing cluster.ts, it runs as primary and starts workers
         const { getActiveWorkers: getWorkerCount } = await import('./cluster');
         const count = getWorkerCount();

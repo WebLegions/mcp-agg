@@ -58,7 +58,6 @@ describe('mcp-cli', () => {
             Object(process).stdin = originalStdin;
             mockStdin = undefined;
         }
-        mock.restoreAll();
         // Each test should clean up only the servers it creates.
     });
 

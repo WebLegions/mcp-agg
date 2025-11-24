@@ -1,13 +1,18 @@
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert/strict';
-import { describe, mock, test } from 'node:test';
+import { afterEach, describe, mock, test } from 'node:test';
 import { sleep } from '../../utils/time';
 import { ApiClient, ClientOptions, PromiseRetry } from './api-client';
 import { SSESession } from './sse-session';
 
-describe('ResilientClient', () => {
+describe('ApiClient', () => {
     const baseURL = 'https://api.example.com';
 
-    test('ResilientClient positive', async (t) => {
+    afterEach(() => {
+        // Clear the pool after each test to prevent state leakage
+        ApiClient.clearPool();
+    });
+
+    test('ApiClient positive', async (t) => {
         const mockResponse = { data: 'success' };
         const fn = mock.method(globalThis, 'fetch', async (input: string) => {
             ok(input.startsWith(baseURL));
@@ -18,7 +23,8 @@ describe('ResilientClient', () => {
             deepStrictEqual(result, mockResponse);
             ok(fn.mock.calls.length === 1);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -40,7 +46,8 @@ describe('ResilientClient', () => {
             deepStrictEqual(result, mockResponse);
             ok(!retry.state.aborted);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -56,7 +63,8 @@ describe('ResilientClient', () => {
             strictEqual(fn.mock.calls.length, 2);
             ok(!retry.state.aborted);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -77,7 +85,8 @@ describe('ResilientClient', () => {
             ok(fn.mock.calls.length > 0);
             ok(retry.state.aborted);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -97,7 +106,8 @@ describe('ResilientClient', () => {
             ok(retry.state.aborted);
             strictEqual(retry.state.reason, 'test');
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -119,7 +129,8 @@ describe('ResilientClient', () => {
             ok(retry.signal.aborted);
             strictEqual(retry.state.reason, 'caller abort');
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -154,7 +165,8 @@ describe('ResilientClient', () => {
             strictEqual(done2, true);
             strictEqual(fn.mock.calls.length, 1);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -171,7 +183,8 @@ describe('ResilientClient', () => {
             strictEqual(result, 'text-data');
             strictEqual(fn.mock.calls.length, 1);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -202,14 +215,14 @@ describe('ResilientClient', () => {
 
             strictEqual(fn.mock.calls.length, 2);
         } finally {
-            mock.reset();
+            fn.mock.restore();
             ApiClient.clearPool();
         }
     });
 
     test('static fetch creates separate clients for different origins', async (_t) => {
         const mockResponse = { data: 'separate' };
-        const _fn = mock.method(globalThis, 'fetch', async () => {
+        const fn = mock.method(globalThis, 'fetch', async () => {
             return new Response(JSON.stringify(mockResponse), { status: 200 });
         });
         try {
@@ -225,14 +238,14 @@ describe('ResilientClient', () => {
             ok(stats.origins.some((k) => k.startsWith('https://api1.example.com:')));
             ok(stats.origins.some((k) => k.startsWith('https://api2.example.com:')));
         } finally {
-            mock.reset();
+            fn.mock.restore();
             ApiClient.clearPool();
         }
     });
 
     test('static fetch pool respects maxPoolSize with LRU eviction', async (_t) => {
         const mockResponse = { data: 'lru' };
-        const _fn = mock.method(globalThis, 'fetch', async () => {
+        const fn = mock.method(globalThis, 'fetch', async () => {
             return new Response(JSON.stringify(mockResponse), { status: 200 });
         });
         try {
@@ -251,7 +264,7 @@ describe('ResilientClient', () => {
             ok(!stats.origins.some((k) => k.startsWith('https://api1.example.com:')));
             ok(stats.origins.some((k) => k.startsWith('https://api51.example.com:')));
         } finally {
-            mock.reset();
+            fn.mock.restore();
             ApiClient.clearPool();
         }
     });
@@ -272,7 +285,6 @@ describe('ResilientClient', () => {
             strictEqual(stats.size, 2); // Different tokens = different pool entries
             strictEqual(fn.mock.calls.length, 2);
         } finally {
-            mock.reset();
             ApiClient.clearPool();
         }
     });
@@ -291,7 +303,8 @@ describe('ResilientClient', () => {
             deepStrictEqual(result, mockResponse);
             strictEqual(fn.mock.calls.length, 1);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -311,7 +324,8 @@ describe('ResilientClient', () => {
             deepStrictEqual(result, mockResponse);
             strictEqual(fn.mock.calls.length, 1);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -329,7 +343,8 @@ describe('ResilientClient', () => {
             ok(caughtError);
             ok(fn.mock.calls.length === 1);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -345,7 +360,8 @@ describe('ResilientClient', () => {
             ok(finallyCalled);
             ok(fn.mock.calls.length === 1);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -363,7 +379,8 @@ describe('ResilientClient', () => {
             deepStrictEqual(result, { ok: true });
             ok(fn.mock.calls.length === 2);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -380,7 +397,8 @@ describe('ResilientClient', () => {
             deepStrictEqual(result, mockResponse);
             ok(fn.mock.calls.length === 1);
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -412,7 +430,8 @@ describe('ResilientClient', () => {
 
             session.close();
         } finally {
-            mock.reset();
+            fn.mock.restore();
+            ApiClient.clearPool();
         }
     });
 
@@ -445,7 +464,7 @@ describe('ResilientClient', () => {
 
             session.close();
         } finally {
-            mock.reset();
+            fn.mock.restore();
             ApiClient.clearPool();
         }
     });

@@ -3,16 +3,11 @@
  */
 
 import { strict as assert } from 'node:assert/strict';
-import { afterEach, describe, mock, test } from 'node:test';
+import { describe, mock, test } from 'node:test';
 import { ApiClient } from '../../shared/libs/api-client';
 import { SseClient } from './sse-client';
 
 describe('sse-client', () => {
-    afterEach(() => {
-        mock.restoreAll();
-        ApiClient.clearPool();
-    });
-
     test('constructor accepts URL and options', () => {
         const client = new SseClient('http://localhost:3000', {
             endpoint: '/custom-sse',

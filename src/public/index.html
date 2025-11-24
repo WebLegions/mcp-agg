@@ -1,61 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fastify Bun Starter</title>
+    <title>MCP Aggregator</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Classless CSS for base styling -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/digitallytailored/classless@latest/classless.min.css">
+
+    <!-- Juris library from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/juris@0.9.0/juris.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/juris@0.9.0/juris-cssextractor.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/juris@0.9.0/juris-headless.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/juris@0.9.0/headless/juris-router.js"></script>
+
     <script>
-        // Initialize theme
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const savedTheme = localStorage.getItem('theme');
-        const initialTheme = savedTheme ? savedTheme === 'dark' : prefersDark;
+        // Initialize theme before content loads to prevent flash
+        const initialTheme = localStorage.getItem('theme') === 'dark' ||
+            (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.setAttribute('color-scheme', initialTheme ? 'dark' : 'light');
     </script>
 </head>
+
 <body>
-    <main>
-        <header>
-            <h1>Welcome! 👋</h1>
-            <p>Fastify Bun Starter API Server</p>
-        </header>
-
-        <section>
-            <h2>Quick Links</h2>
-            <nav>
-                <ul>
-                    <li>
-                        <a href="/api/v1/swagger">
-                            <strong>📚 Swagger UI</strong><br>
-                            Interactive API documentation and testing interface
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/mcp">
-                            <strong>🔌 MCP Endpoint</strong><br>
-                            Model Context Protocol JSON-RPC interface
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/health">
-                            <strong>💚 Health Check</strong><br>
-                            Server health and status information
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/mcp-config.html">
-                            <strong>🔧 MCP Configuration</strong><br>
-                            Manage MCP server configurations
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-        </section>
-
-        <footer>
-            <p>Powered by Fastify + Bun</p>
-        </footer>
-    </main>
+    <div id="app"></div>
+    <script type="module" src="/app/main.ts"></script>
 </body>
+
 </html>

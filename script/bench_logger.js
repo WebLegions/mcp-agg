@@ -87,10 +87,20 @@ function logZ3(message, ..._optionalParams) {
 let outputLines = 0;
 
 async function main() {
+    // Check if pino is installed
+    let pino;
+    try {
+        pino = (await import('pino')).default;
+    } catch (_err) {
+        console.error('ERROR: pino is not installed.');
+        console.error('For this benchmark to run, you need to manually install the library under test.');
+        console.error('Use: bun install pino');
+        process.exit(1);
+    }
+
     const { performance } = await import('node:perf_hooks');
     const { hostname } = await import('node:os');
     const { createLogger, SpeedStd } = await import('../src/util/logger.ts');
-    const pino = (await import('pino')).default;
 
     function randomLine(minLen = LT_MIN_LINE_LENGTH, maxLen = LT_MAX_LINE_LENGTH) {
         const len = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;

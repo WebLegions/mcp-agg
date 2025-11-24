@@ -157,7 +157,7 @@ describe('safe', () => {
 
             equal(fn.mock.calls.length, 2);
         } finally {
-            mock.restoreAll();
+            fn.mock.restore();
         }
     });
 

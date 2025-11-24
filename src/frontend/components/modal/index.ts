@@ -8,8 +8,9 @@
  * Uses manual backdrop div for styling and click-outside-to-close functionality.
  */
 
-import type { ExtendedStyleObject, JurisContext, JurisInstance, JurisVDOMElement, ReactiveValue } from '../../types/juris';
-import { closeIcon, registerIcon } from '../icon';
+import type { App, AppComponent } from '../../main';
+import type { JurisVDOMElement, ReactiveValue, StyleObject } from '../../types/juris';
+import { closeIcon, icon } from '../icon';
 
 export interface ModalProps {
     /** Unique ID for the modal element */
@@ -53,7 +54,7 @@ export interface ModalProps {
  *   stateKey: 'ui.alert'
  * }, ctx)
  */
-export function Modal(props: ModalProps, ctx: JurisContext): JurisVDOMElement {
+export const modal: AppComponent<ModalProps> = (props, ctx) => {
     const { id, title = 'Modal', message, stateKey, children, footerButtons, zIndex = 1000 } = props;
 
     // Default OK button if no custom buttons provided
@@ -74,16 +75,16 @@ export function Modal(props: ModalProps, ctx: JurisContext): JurisVDOMElement {
     // Content: either simple message or custom children
     const modalContent: JurisVDOMElement[] = message
         ? [
-            {
-                p: {
-                    text: message,
-                },
-            },
-        ]
+              {
+                  p: {
+                      text: message,
+                  },
+              },
+          ]
         : children || [];
 
     // CSSExtractor Styles
-    const style: ExtendedStyleObject = {
+    const style: StyleObject = {
         // Modal backdrop - fixed overlay
         position: 'fixed',
         top: '0',
@@ -228,8 +229,8 @@ export function Modal(props: ModalProps, ctx: JurisContext): JurisVDOMElement {
                                             },
                                         },
                                         {
-                                            Icon: {
-                                                svg: closeIcon,
+                                            icon: {
+                                                image: closeIcon,
                                                 onClick: () => {
                                                     ctx.setState(stateKey, '');
                                                 },
@@ -260,12 +261,12 @@ export function Modal(props: ModalProps, ctx: JurisContext): JurisVDOMElement {
             ],
         },
     };
-}
+};
 
 /**
- * Register Modal component with Juris
+ * Register Modal component with App
  */
-export function registerModal(juris: JurisInstance): void {
-    registerIcon(juris);
-    juris.registerComponent('Modal', (props, ctx) => Modal(props as ModalProps, ctx));
+export function registerModal(app: App): void {
+    app.registerComponent('icon', icon as never);
+    app.registerComponent('modal', modal as never);
 }
