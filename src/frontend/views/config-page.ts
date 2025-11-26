@@ -76,142 +76,135 @@ export const configPage: j.Component = (_props, ctx) => {
         ] as const;
 
     return {
-        div: {
+        main: {
             children: [
                 {
-                    main: {
+                    header: {
                         children: [
                             {
-                                header: {
-                                    children: [
-                                        {
-                                            h1: {
-                                                text: '🔧 MCP Aggregator Configuration',
-                                            },
+                                h1: {
+                                    text: '🔧 MCP Aggregator Configuration',
+                                },
+                            },
+                        ],
+                    },
+                },
+                {
+                    section: {
+                        children: () => {
+                            const servers = ctx.getState<MCPServerConfig[]>('servers.items', []);
+                            const total = servers.length;
+                            const enabled = servers.filter((s) => s.enabled).length;
+                            const disabled = total - enabled;
+
+                            return [
+                                {
+                                    p: {
+                                        style: {
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
                                         },
-                                    ],
-                                },
-                            },
-                            {
-                                section: {
-                                    children: () => {
-                                        const servers = ctx.getState<MCPServerConfig[]>('servers.items', []);
-                                        const total = servers.length;
-                                        const enabled = servers.filter((s) => s.enabled).length;
-                                        const disabled = total - enabled;
-
-                                        return [
-                                            {
-                                                p: {
-                                                    style: {
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        alignItems: 'center',
-                                                    },
-                                                    children: [
-                                                        {
-                                                            span: {
-                                                                children: [
-                                                                    { span: { text: `Total: ${total} • ` } },
-                                                                    { span: { text: `Enabled: ${enabled} • ` } },
-                                                                    { span: { text: `Disabled: ${disabled}` } },
-                                                                ],
-                                                            },
-                                                        },
-                                                        {
-                                                            button: {
-                                                                id: 'config-page-add-server-button',
-                                                                text: '+ Add Server',
-                                                                onClick: () => {
-                                                                    ctx.setState('ui.serverModalMode', 'create');
-                                                                    ctx.setState('ui.showServerModal', true);
-                                                                    ctx.setState('serverModal.name.value', '');
-                                                                    ctx.setState('serverModal.name.error', '');
-                                                                    ctx.setState('serverModal.transport.value', 'stdio');
-                                                                    ctx.setState('serverModal.transport.error', '');
-                                                                    ctx.setState('serverModal.command.value', '');
-                                                                    ctx.setState('serverModal.command.error', '');
-                                                                    ctx.setState('serverModal.url.value', '');
-                                                                    ctx.setState('serverModal.url.error', '');
-                                                                    ctx.setState('serverModal.args.value', '');
-                                                                    ctx.setState('serverModal.args.error', '');
-                                                                    ctx.setState('serverModal.enabled.value', true);
-                                                                    ctx.setState('serverModal.enabled.error', '');
-                                                                    ctx.setState('serverModal.description.value', '');
-                                                                    ctx.setState('serverModal.description.error', '');
-                                                                    ctx.setState('serverModal.validated', false);
-                                                                },
-                                                            },
-                                                        },
-                                                    ],
-                                                },
-                                            },
-                                        ];
-                                    },
-                                },
-                            },
-                            () =>
-                                ctx.getState('servers.loading', true) && {
-                                    p: {
-                                        text: 'Loading servers...',
-                                    },
-                                },
-
-                            () =>
-                                ctx.getState('servers.error', '') !== '' && {
-                                    p: {
-                                        text: `Error: ${ctx.getState('servers.error', '')}`,
-                                        style: { color: 'var(--danger, red)' },
-                                    },
-                                },
-
-                            () =>
-                                !ctx.getState('servers.loading', true) &&
-                                ctx.getState('servers.items', []).length === 0 && {
-                                    p: {
-                                        text: 'No servers configured. Click "Add Server" to create your first MCP server configuration.',
-                                    },
-                                },
-
-                            () =>
-                                ctx.getState('servers.items', []).length > 0 && {
-                                    table: {
                                         children: [
                                             {
-                                                thead: {
+                                                span: {
                                                     children: [
-                                                        {
-                                                            tr: {
-                                                                children: [
-                                                                    { th: { text: 'NAME' } },
-                                                                    { th: { text: 'STATUS' } },
-                                                                    { th: { text: 'TRANSPORT' } },
-                                                                    { th: { text: 'COMMAND/URL' } },
-                                                                    { th: { text: 'DESCRIPTION' } },
-                                                                    { th: { text: 'ACTIONS' } },
-                                                                ],
-                                                            },
-                                                        },
+                                                        { span: { text: `Total: ${total} • ` } },
+                                                        { span: { text: `Enabled: ${enabled} • ` } },
+                                                        { span: { text: `Disabled: ${disabled}` } },
                                                     ],
                                                 },
                                             },
                                             {
-                                                tbody: {
-                                                    children: ctx
-                                                        .getState<MCPServerConfig[]>('servers.items', [])
-                                                        .map((server: MCPServerConfig) => ({
-                                                            serverRow: {
-                                                                server,
-                                                            },
-                                                        })),
+                                                button: {
+                                                    id: 'config-page-add-server-button',
+                                                    text: '+ Add Server',
+                                                    onClick: () => {
+                                                        ctx.setState('ui.serverModalMode', 'create');
+                                                        ctx.setState('ui.showServerModal', true);
+                                                        ctx.setState('serverModal.name.value', '');
+                                                        ctx.setState('serverModal.name.error', '');
+                                                        ctx.setState('serverModal.transport.value', 'stdio');
+                                                        ctx.setState('serverModal.transport.error', '');
+                                                        ctx.setState('serverModal.command.value', '');
+                                                        ctx.setState('serverModal.command.error', '');
+                                                        ctx.setState('serverModal.url.value', '');
+                                                        ctx.setState('serverModal.url.error', '');
+                                                        ctx.setState('serverModal.args.value', '');
+                                                        ctx.setState('serverModal.args.error', '');
+                                                        ctx.setState('serverModal.enabled.value', true);
+                                                        ctx.setState('serverModal.enabled.error', '');
+                                                        ctx.setState('serverModal.description.value', '');
+                                                        ctx.setState('serverModal.description.error', '');
+                                                        ctx.setState('serverModal.validated', false);
+                                                    },
                                                 },
                                             },
                                         ],
                                     },
                                 },
-                        ],
+                                () =>
+                                    ctx.getState('servers.loading', true) && {
+                                        p: {
+                                            text: 'Loading servers...',
+                                        },
+                                    },
+
+                                () =>
+                                    ctx.getState('servers.error', '') !== '' && {
+                                        p: {
+                                            text: `Error: ${ctx.getState('servers.error', '')}`,
+                                            style: { color: 'var(--danger, red)' },
+                                        },
+                                    },
+
+                                () =>
+                                    !ctx.getState('servers.loading', true) &&
+                                    ctx.getState('servers.items', []).length === 0 && {
+                                        p: {
+                                            text: 'No servers configured. Click "Add Server" to create your first MCP server configuration.',
+                                        },
+                                    },
+                            ];
+                        },
                     },
                 },
+                () =>
+                    ctx.getState('servers.items', []).length > 0 && {
+                        table: {
+                            children: [
+                                {
+                                    thead: {
+                                        children: [
+                                            {
+                                                tr: {
+                                                    children: [
+                                                        { th: { text: 'NAME' } },
+                                                        { th: { text: 'STATUS' } },
+                                                        { th: { text: 'TRANSPORT' } },
+                                                        { th: { text: 'COMMAND/URL' } },
+                                                        { th: { text: 'DESCRIPTION' } },
+                                                        { th: { text: 'ACTIONS' } },
+                                                    ],
+                                                },
+                                            },
+                                        ],
+                                    },
+                                },
+                                {
+                                    tbody: {
+                                        children: ctx
+                                            .getState<MCPServerConfig[]>('servers.items', [])
+                                            .map((server: MCPServerConfig) => ({
+                                                serverRow: {
+                                                    server,
+                                                },
+                                            })),
+                                    },
+                                },
+                            ],
+                        },
+                    },
                 { serverModal: {} },
                 // Menu
                 () => {
@@ -228,7 +221,7 @@ export const configPage: j.Component = (_props, ctx) => {
                                 },
                             },
                         }
-                    );
+                    ); // return
                 },
             ],
         },

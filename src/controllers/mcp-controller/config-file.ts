@@ -5,7 +5,7 @@
  * - Class-based design with EventEmitter
  * - No circular dependencies
  * - Synchronous broadcast via events
- * - File watching in cluster mode
+ * - File watching for cluster mode: other processes can write to the config file.
  */
 
 import { EventEmitter } from 'node:events';
@@ -54,6 +54,61 @@ export class MCPConfigManager extends EventEmitter {
         if (this._watch) {
             this._startWatching();
         }
+    }
+
+    // ============================================================================
+    // Static Factory Method
+    // ============================================================================
+
+    /**
+     * Static factory method to create server configurations
+     * @param name - Server name
+     * @param transport - Transport type (stdio, sse, http)
+     * @param commandOrUrl - Command for stdio or URL for sse/http
+     * @param args - Optional command arguments for stdio
+     * @param env - Optional environment variables
+     * @param enabled - Whether server is enabled (default: true)
+     * @returns Server configuration object
+     */
+    static create(
+        name: string,
+        transport: MCPTransport,
+        commandOrUrl: string,
+        args?: string[],
+        env?: MCPEnv,
+        enabled = true,
+    ): MCPServerConfig {
+        if (transport === 'stdio') {
+            const config: MCPServerConfig = { name, transport, command: commandOrUrl, enabled };
+            config.args = args ?? [];
+            if (env) config.env = env;
+            return config;
+        }
+        if (transport === 'http' || transport === 'sse') {
+            const config: MCPServerConfig = { name, transport, url: commandOrUrl, enabled };
+            if (env) config.env = env;
+            return config;
+        }
+        throw new McpError(`Unsupported transport type: ${transport}`);
+    }
+
+    /**
+     * Create a new server configuration
+     * @param serverConfig - Server configuration to create
+     * @returns The created server configuration
+     */
+    async create(serverConfig: MCPServerConfig): Promise<MCPServerConfig> {
+        this.isValidServer(serverConfig);
+        const config = await this.read();
+
+        // Check if server already exists
+        if (config.mcpServers.has(serverConfig.name)) {
+            throw new McpError(`Server "${serverConfig.name}" already exists`);
+        }
+
+        config.mcpServers.set(serverConfig.name, serverConfig);
+        await this.write(config);
+        return serverConfig;
     }
 
     isValidServer(config: unknown): config is MCPServerConfig {
@@ -173,25 +228,6 @@ export class MCPConfigManager extends EventEmitter {
     }
 
     /**
-     * Create a new server configuration
-     * @param serverConfig - Server configuration to create
-     * @returns The created server configuration
-     */
-    async create(serverConfig: MCPServerConfig): Promise<MCPServerConfig> {
-        this.isValidServer(serverConfig);
-        const config = await this.read();
-
-        // Check if server already exists
-        if (config.mcpServers.has(serverConfig.name)) {
-            throw new McpError(`Server "${serverConfig.name}" already exists`);
-        }
-
-        config.mcpServers.set(serverConfig.name, serverConfig);
-        await this.write(config);
-        return serverConfig;
-    }
-
-    /**
      * Update an existing server configuration
      * @param name - Server name to update
      * @param updates - Partial server configuration to update
@@ -278,42 +314,6 @@ export class MCPConfigManager extends EventEmitter {
     /** @deprecated Use update(name, { enabled }) instead */
     async enable(name: string, enabled: boolean): Promise<void> {
         await this.update(name, { enabled });
-    }
-
-    // ============================================================================
-    // Static Factory Method
-    // ============================================================================
-
-    /**
-     * Static factory method to create server configurations
-     * @param name - Server name
-     * @param transport - Transport type (stdio, sse, http)
-     * @param commandOrUrl - Command for stdio or URL for sse/http
-     * @param args - Optional command arguments for stdio
-     * @param env - Optional environment variables
-     * @param enabled - Whether server is enabled (default: true)
-     * @returns Server configuration object
-     */
-    static create(
-        name: string,
-        transport: MCPTransport,
-        commandOrUrl: string,
-        args?: string[],
-        env?: MCPEnv,
-        enabled = true,
-    ): MCPServerConfig {
-        if (transport === 'stdio') {
-            const config: MCPServerConfig = { name, transport, command: commandOrUrl, enabled };
-            config.args = args ?? [];
-            if (env) config.env = env;
-            return config;
-        }
-        if (transport === 'http' || transport === 'sse') {
-            const config: MCPServerConfig = { name, transport, url: commandOrUrl, enabled };
-            if (env) config.env = env;
-            return config;
-        }
-        throw new McpError(`Unsupported transport type: ${transport}`);
     }
 
     /**

@@ -135,7 +135,8 @@ export class DateEx extends Date {
         const diffHours = Math.floor(diffMins / 60);
         const diffDays = Math.floor(diffHours / 24);
 
-        if (diffSecs < 60) return 'just now';
+        if (diffSecs < 10) return 'just now';
+        if (diffSecs < 60) return `${diffSecs} seconds ago`;
         if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
         if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
         if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;

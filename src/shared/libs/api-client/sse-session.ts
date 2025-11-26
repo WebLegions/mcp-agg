@@ -197,7 +197,7 @@ export class SSESession extends EventTarget {
                             let parsedData: unknown = data;
                             try {
                                 parsedData = JSON.parse(data);
-                            } catch { }
+                            } catch {}
                             if (eventType === 'endpoint' && typeof parsedData === 'string') {
                                 this._endpoint = parsedData;
                                 const match = parsedData.match(/[?&]session[_-]?id=([^&]+)/i);

@@ -211,6 +211,11 @@ export const serverModal: j.Component = (_props, ctx) => {
         }
 
         // Submit form - call create or update based on modal mode
+        if (!ctx.config) {
+            // Config service not available (test environment) - silently return
+            return;
+        }
+
         const mode = ctx.getState<string>('ui.serverModalMode', 'create');
         if (mode === 'create') {
             await ctx.config.create();

@@ -197,7 +197,7 @@ export class PromiseRetry<T> implements PromiseLike<T> {
      * the rest of Promise-like methods
      */
 
-    static withResolvers<T>(opts?: Readonly<Partial<ClientOptions>>, extSignal?: AbortSignal): PromiseRetry<T> {
+    static withResolvers<T>(opts?: Partial<ClientOptions>, extSignal?: AbortSignal): PromiseRetry<T> {
         return new PromiseRetry<T>(new ClientOptions(opts), extSignal);
     }
 
@@ -233,7 +233,7 @@ export class ApiClient {
      * @param baseURL - The base URL for the service.
      * @param options - Configuration for the client.
      */
-    constructor(baseURL: string, options?: Readonly<Partial<ClientOptions>>) {
+    constructor(baseURL: string, options?: Partial<ClientOptions>) {
         this._baseURL = baseURL;
         if (options) {
             // Replace POJO.copyIn with Object.assign

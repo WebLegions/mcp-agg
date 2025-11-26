@@ -50,6 +50,9 @@ export const appShell: j.Component = (_props, ctx) => {
         APP_ROUTES.forEach((route) => {
             router.addRoute(route.path, { component: route.component });
         });
+
+        // Load initial server configuration
+        config.find().catch(console.error);
     }
 
     return {

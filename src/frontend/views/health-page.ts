@@ -2,6 +2,7 @@ import { ApiClient } from '../../shared/libs/api-client';
 import type { HealthResponse } from '../../shared/types/health';
 import { ErrorEx } from '../../shared/utils/error';
 import { capitalize, escapeHTML, labelify } from '../../shared/utils/text';
+import { DateEx } from '../../shared/utils/time';
 import type { j } from '../main';
 
 export const healthPage: j.Component = async (_props, ctx) => {
@@ -11,8 +12,6 @@ export const healthPage: j.Component = async (_props, ctx) => {
     const url = `${ctx.api.baseUrl}../../health`;
 
     //function parse(data: )
-
-
 
     async function refresh() {
         ctx.setState(stateKey, 'loading');
@@ -67,6 +66,21 @@ export const healthPage: j.Component = async (_props, ctx) => {
     `;
     document.head.appendChild(style);
 
+    function startTimer() {
+        const interval = setInterval(() => {
+            const data = JSON.parse(ctx.getState(dataKey, '{}')) as Partial<HealthResponse>;
+            if (data && data.status === 'ok' && data.timestamp) {
+                const elem = document.getElementById('health-page-ok-time');
+                if (elem) {
+                    elem.textContent = `Last checked ${new DateEx(data.timestamp).toRelativeString()}`;
+                }
+            } else {
+                clearInterval(interval);
+            }
+        }, 1000);
+        return interval;
+    }
+
     return {
         main: {
             children: [
@@ -105,18 +119,31 @@ export const healthPage: j.Component = async (_props, ctx) => {
                                     },
                                 },
                             () =>
-                                ctx.getState(stateKey, '') === 'ok' && {
+                                ctx.getState(stateKey, '') === 'ok' &&
+                                !!startTimer() && {
                                     p: {
                                         id: 'health-page-ok',
-                                        text: '● Operational',
-                                        style: { color: `var(--success, #22c55e)` },
+                                        style: { color: 'var(--success, #22c55e)' },
+                                        children: [
+                                            {
+                                                span: {
+                                                    text: '✓ Operational.  ',
+                                                },
+                                            },
+                                            {
+                                                span: {
+                                                    id: 'health-page-ok-time',
+                                                    text: '',
+                                                },
+                                            },
+                                        ],
                                     },
                                 },
                             () =>
                                 ctx.getState(stateKey, '') === 'error' && {
                                     p: {
                                         id: 'health-page-error',
-                                        text: `● ${ctx.getState(errorKey, '')}`,
+                                        text: `✗ ${ctx.getState(errorKey, '')}`,
                                         style: { color: `var(--danger, #ef4444)` },
                                     },
                                 },

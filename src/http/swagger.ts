@@ -148,35 +148,68 @@ function getScalarPageHtml() {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 <body>
-    <div id="api-reference" 
-        data-url="/api/v1/openapi.json" 
-        data-configuration='{"showSidebar":true,"hideModels":true,"theme":"default","darkMode":true,"layout":"modern"}'>
-    </div>
+    <div id="api-reference"></div>
 
     <script>
-        // update the above div with current theme
-        function updateTheme(isDark) {
-            const apiRef = document.getElementById('api-reference');
-            if (apiRef) {
-                console.log('[Scalar] dataset:', typeof apiRef.dataset.configuration, apiRef.dataset.configuration);
-                const currentConfig = JSON.parse(apiRef.dataset.configuration);
-                if (currentConfig.darkMode === isDark) return;
-                const newConfig = { ...currentConfig, darkMode: isDark };
-                console.log('[Scalar] newConfig:', newConfig);
-                apiRef.dataset.configuration = JSON.stringify(newConfig);
+        // Determine current theme from localStorage or system preference BEFORE Scalar loads
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        // If savedTheme exists, use it explicitly (could be 'dark' or 'light')
+        // If no savedTheme, fall back to system preference
+        const isDark = savedTheme ? savedTheme === 'dark' : prefersDark;
+
+        console.log('[Scalar] Theme detection:', {
+            savedTheme,
+            prefersDark,
+            isDark,
+            allLocalStorageKeys: Object.keys(localStorage)
+        });
+
+        // Clear ALL localStorage except 'theme' - Scalar stores its own preferences
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key !== 'theme') {
+                keysToRemove.push(key);
             }
         }
+        keysToRemove.forEach(key => {
+            console.log('[Scalar] Removing localStorage key:', key);
+            localStorage.removeItem(key);
+        });
 
-        // update the above div with current theme
-        const isDark = (localStorage.getItem('theme') === 'dark') || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        // Set configuration on the div that Scalar will use
+        const apiRef = document.getElementById('api-reference');
+        if (apiRef) {
+            const config = {
+                spec: { url: '/api/v1/openapi.json' },
+                showSidebar: true,
+                hideModels: true,
+                darkMode: isDark,
+                layout: 'modern'
+            };
+            apiRef.setAttribute('data-configuration', JSON.stringify(config));
+            console.log('[Scalar] Config set with darkMode:', isDark, 'config:', JSON.stringify(config));
+        }
+
+        // Apply theme to document
         document.documentElement.setAttribute('color-scheme', isDark ? 'dark' : 'light');
-        updateTheme(isDark);
-     </script>
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.25.0"></script>
 
     <script>
         console.log('[Scalar] Initializing theme sync...');
+
+        // Verify theme was applied after Scalar loads
+        setTimeout(() => {
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = savedTheme ? savedTheme === 'dark' : prefersDark;
+
+            console.log('[Scalar] Post-load verification - theme should be:', isDark ? 'dark' : 'light');
+        }, 500);
 
         // Listen for theme changes from parent window
         window.addEventListener('message', (event) => {

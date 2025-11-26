@@ -7,7 +7,7 @@ import type { j } from '../main';
  * Service for managing MCP server CRUD operations
  */
 export class ConfigService {
-    constructor(private _ctx: j.Context) { }
+    constructor(private _ctx: j.Context) {}
 
     async loadServers(): Promise<void> {
         try {
@@ -40,20 +40,20 @@ export class ConfigService {
         const serverConfig: unknown =
             transport === 'stdio'
                 ? {
-                    name,
-                    transport: 'stdio',
-                    command,
-                    args: argsStr ? argsStr.split(/\s+/).filter((a) => a.length > 0) : undefined,
-                    enabled,
-                    description: description || undefined,
-                }
+                      name,
+                      transport: 'stdio',
+                      command,
+                      args: argsStr ? argsStr.split(/\s+/).filter((a) => a.length > 0) : undefined,
+                      enabled,
+                      description: description || undefined,
+                  }
                 : {
-                    name,
-                    transport,
-                    url,
-                    enabled,
-                    description: description || undefined,
-                };
+                      name,
+                      transport,
+                      url,
+                      enabled,
+                      description: description || undefined,
+                  };
 
         // Validate using MCPServerConfigSchema
         const result = z.safeParse(mcpServerConfigSchema, serverConfig);
