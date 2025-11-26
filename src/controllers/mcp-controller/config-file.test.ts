@@ -8,7 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { describe, test } from 'node:test';
 import { sleep } from '../../shared/utils/time';
-import { MCPConfigManager } from './config';
+import { MCPConfigManager } from './config-file';
 
 // Helper function to run a test with an isolated manager
 async function withManager<T>(testName: string, fn: (manager: MCPConfigManager) => Promise<T>): Promise<T> {
@@ -51,7 +51,7 @@ describe('MCP Config file', () => {
     test('reads existing config file', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig = MCPConfigManager.create('test-server', 'stdio', 'node', ['server.js']);
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
             const config = await manager.read();
             ok(config.mcpServers.has('test-server'));
@@ -82,7 +82,7 @@ describe('MCP Config file', () => {
         await withManager(t.name, async (manager) => {
             const configPath = Object(manager)._configPath as string;
             const serverConfig = MCPConfigManager.create('write-test', 'sse', 'http://example.com/sse');
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
             ok(existsSync(configPath));
 
@@ -101,10 +101,10 @@ describe('MCP Config file', () => {
         await withManager(t.name, async (manager) => {
             const configPath = Object(manager)._configPath as string;
             const server1 = MCPConfigManager.create('server1', 'stdio', 'node');
-            await manager.upsertServer(server1);
+            await manager.create(server1);
 
             const server2 = MCPConfigManager.create('server2', 'stdio', 'bun');
-            await manager.upsertServer(server2);
+            await manager.create(server2);
 
             ok(existsSync(`${configPath}.backup`));
 
@@ -191,7 +191,7 @@ describe('MCP Config file', () => {
 
     test('getAllServers returns builtin server for default config', async (t) => {
         await withManager(t.name, async (manager) => {
-            const servers = await manager.getAllServers();
+            const servers = await manager.find();
             strictEqual(servers.length, 1);
             strictEqual(servers[0].name, 'builtin');
             strictEqual(servers[0].description, 'Built-in aggregator tools (health, format_number)');
@@ -201,9 +201,9 @@ describe('MCP Config file', () => {
     test('upsertServer adds new server', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig = MCPConfigManager.create('new-server', 'stdio', 'node', ['test.js']);
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
-            const servers = await manager.getAllServers();
+            const servers = await manager.find();
             // builtin stays present, new server is added
             strictEqual(servers.length, 2);
             const newServer = servers.find((s) => s.name === 'new-server');
@@ -212,15 +212,15 @@ describe('MCP Config file', () => {
         });
     });
 
-    test('upsertServer updates existing server', async (t) => {
+    test('update modifies existing server', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig1 = MCPConfigManager.create('server', 'stdio', 'node');
-            await manager.upsertServer(serverConfig1);
+            await manager.create(serverConfig1);
 
-            const serverConfig2 = MCPConfigManager.create('server', 'stdio', 'bun');
-            await manager.upsertServer(serverConfig2);
+            // Update the existing server
+            await manager.update('server', { command: 'bun' });
 
-            const servers = await manager.getAllServers();
+            const servers = await manager.find();
             strictEqual(servers.length, 2); // server + builtin
             const updatedServer = servers.find((s) => s.name === 'server');
             ok(updatedServer);
@@ -232,7 +232,7 @@ describe('MCP Config file', () => {
 
     test('getServer returns undefined for non-existent server', async (t) => {
         await withManager(t.name, async (manager) => {
-            const server = await manager.getServer('non-existent');
+            const server = await manager.find('non-existent');
             strictEqual(server, undefined);
         });
     });
@@ -240,39 +240,44 @@ describe('MCP Config file', () => {
     test('getServer returns server config', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig = MCPConfigManager.create('test-server', 'stdio', 'node');
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
-            const server = await manager.getServer('test-server');
+            const server = await manager.find('test-server');
             deepStrictEqual(server, serverConfig);
         });
     });
 
-    test('removeServer removes existing server', async (t) => {
+    test('delete removes existing server', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig = MCPConfigManager.create('to-remove', 'stdio', 'node');
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
-            const removed = await manager.removeServer('to-remove');
-            ok(removed);
+            await manager.delete('to-remove');
 
-            const servers = await manager.getAllServers();
+            const servers = await manager.find();
             // After removing the last server, builtin appears again
             strictEqual(servers.length, 1);
             strictEqual(servers[0].name, 'builtin');
         });
     });
 
-    test('removeServer returns false for non-existent server', async (t) => {
+    test('delete throws for non-existent server', async (t) => {
         await withManager(t.name, async (manager) => {
-            const removed = await manager.removeServer('non-existent');
-            strictEqual(removed, false);
+            let error: Error | undefined;
+            try {
+                await manager.delete('non-existent');
+            } catch (err) {
+                error = err as Error;
+            }
+            ok(error);
+            ok(error?.message.includes('not found'));
         });
     });
 
     test('serverExists returns true for existing server', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig = MCPConfigManager.create('exists', 'stdio', 'node');
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
             const exists = await manager.serverExists('exists');
             ok(exists);
@@ -292,9 +297,9 @@ describe('MCP Config file', () => {
             const enabled2 = MCPConfigManager.create('enabled2', 'stdio', 'bun', [], undefined, true);
             const disabled = MCPConfigManager.create('disabled', 'stdio', 'deno', [], undefined, false);
 
-            await manager.upsertServer(enabled1);
-            await manager.upsertServer(enabled2);
-            await manager.upsertServer(disabled);
+            await manager.create(enabled1);
+            await manager.create(enabled2);
+            await manager.create(disabled);
 
             const enabledServers = await manager.getEnabled();
             strictEqual(enabledServers.length, 3); // enabled1, enabled2, + builtin
@@ -305,11 +310,11 @@ describe('MCP Config file', () => {
     test('setServerEnabled enables server', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig = MCPConfigManager.create('test', 'stdio', 'node', [], undefined, false);
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
-            await manager.enable('test', true);
+            await manager.update('test', { enabled: true });
 
-            const server = await manager.getServer('test');
+            const server = await manager.find('test');
             strictEqual(server?.enabled, true);
         });
     });
@@ -317,11 +322,11 @@ describe('MCP Config file', () => {
     test('setServerEnabled disables server', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig = MCPConfigManager.create('test', 'stdio', 'node', [], undefined, true);
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
-            await manager.enable('test', false);
+            await manager.update('test', { enabled: false });
 
-            const server = await manager.getServer('test');
+            const server = await manager.find('test');
             strictEqual(server?.enabled, false);
         });
     });
@@ -330,7 +335,7 @@ describe('MCP Config file', () => {
         await withManager(t.name, async (manager) => {
             let error: Error | undefined;
             try {
-                await manager.enable('non-existent', true);
+                await manager.update('non-existent', { enabled: true });
             } catch (err) {
                 error = err as Error;
             }
@@ -348,10 +353,10 @@ describe('MCP Config file', () => {
             ];
 
             for (const server of servers) {
-                await manager.upsertServer(server);
+                await manager.create(server);
             }
 
-            const allServers = await manager.getAllServers();
+            const allServers = await manager.find();
             strictEqual(allServers.length, 4); // 3 + builtin
         });
     });
@@ -362,14 +367,14 @@ describe('MCP Config file', () => {
             const server2 = MCPConfigManager.create('b-server', 'stdio', 'bun');
             const server3 = MCPConfigManager.create('c-server', 'stdio', 'deno');
 
-            await manager.upsertServer(server1);
-            await manager.upsertServer(server2);
-            await manager.upsertServer(server3);
+            await manager.create(server1);
+            await manager.create(server2);
+            await manager.create(server3);
 
             // Remove middle server
-            await manager.removeServer('b-server');
+            await manager.delete('b-server');
 
-            const servers = await manager.getAllServers();
+            const servers = await manager.find();
             strictEqual(servers.length, 3); // a, c, + builtin
             const nonBuiltinServers = servers.filter((s) => s.name !== 'builtin');
             strictEqual(nonBuiltinServers.length, 2);
@@ -388,7 +393,7 @@ describe('MCP Config file', () => {
             });
 
             const serverConfig = MCPConfigManager.create('test', 'stdio', 'node');
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
             // Wait for file watcher to detect the change
             await sleep(2);
@@ -397,10 +402,10 @@ describe('MCP Config file', () => {
         });
     });
 
-    test('emits config:changed event on upsertServer (update)', async (t) => {
+    test('emits config:changed event on update', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig1 = MCPConfigManager.create('test', 'stdio', 'node');
-            await manager.upsertServer(serverConfig1);
+            await manager.create(serverConfig1);
 
             // Watcher is automatically started in constructor
             let eventFired = false;
@@ -409,8 +414,8 @@ describe('MCP Config file', () => {
                 eventFired = true;
             });
 
-            const serverConfig2 = MCPConfigManager.create('test', 'stdio', 'bun');
-            await manager.upsertServer(serverConfig2);
+            // Update the existing server
+            await manager.update('test', { command: 'bun' });
 
             // Wait for file watcher to detect the change
             await sleep(2);
@@ -422,7 +427,7 @@ describe('MCP Config file', () => {
     test('emits config:changed event on removeServer', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig = MCPConfigManager.create('test', 'stdio', 'node');
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
             // Watcher is automatically started in constructor
             let eventFired = false;
@@ -431,7 +436,7 @@ describe('MCP Config file', () => {
                 eventFired = true;
             });
 
-            await manager.removeServer('test');
+            await manager.delete('test');
 
             // Wait for file watcher to detect the change
             await sleep(2);
@@ -443,7 +448,7 @@ describe('MCP Config file', () => {
     test('emits config:changed event on setServerEnabled', async (t) => {
         await withManager(t.name, async (manager) => {
             const serverConfig = MCPConfigManager.create('test', 'stdio', 'node', [], undefined, true);
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
             // Watcher is automatically started in constructor
             let eventFired = 0;
@@ -451,7 +456,7 @@ describe('MCP Config file', () => {
                 eventFired++;
             });
 
-            await manager.enable('test', false);
+            await manager.update('test', { enabled: false });
 
             // Wait for file watcher to detect the change
             await sleep(20);
@@ -468,7 +473,7 @@ describe('MCP Config file', () => {
 
             // Create initial server >> fire first
             const serverConfig = MCPConfigManager.create('initial', 'stdio', 'node');
-            await manager.upsertServer(serverConfig);
+            await manager.create(serverConfig);
 
             // Wait for first event to complete
             await sleep(2);
@@ -486,29 +491,33 @@ describe('MCP Config file', () => {
     });
 
     test('does not start file watcher when watch=false', async (t) => {
-        const manager = new MCPConfigManager(t.name, false);
+        await withManager(t.name, async (manager) => {
+            // Create a new manager with watch=false using the same path
+            const noWatchManager = new MCPConfigManager(manager.configPath, false);
 
-        try {
-            let eventFired = 0;
-            manager.on('config:changed', () => {
-                eventFired++;
-            });
+            try {
+                let eventFired = 0;
+                noWatchManager.on('config:changed', () => {
+                    eventFired++;
+                });
 
-            // Add a server
-            const serverConfig = MCPConfigManager.create('test-server', 'stdio', 'node');
-            await manager.upsertServer(serverConfig);
+                // Add a server
+                const serverConfig = MCPConfigManager.create('test-server-nowatch', 'stdio', 'node');
+                await noWatchManager.create(serverConfig);
 
-            // Wait to ensure no events fire from file watching
-            await sleep(2);
+                // Wait to ensure no events fire from file watching
+                await sleep(2);
 
-            // Verify no watch events fired (only the direct modification events count)
-            // Since we're not watching, external file changes won't trigger events
-            strictEqual(eventFired, 0, 'No config:changed events should fire when watch=false');
+                // Verify no watch events fired (only the direct modification events count)
+                // Since we're not watching, external file changes won't trigger events
+                strictEqual(eventFired, 0, 'No config:changed events should fire when watch=false');
 
-            // Verify the manager still works normally for direct operations
-            const config = await manager.read();
-            ok(config.mcpServers.has('test-server'), 'Server should be added');
-        } finally {
-        }
+                // Verify the manager still works normally for direct operations
+                const config = await noWatchManager.read();
+                ok(config.mcpServers.has('test-server-nowatch'), 'Server should be added');
+            } finally {
+                noWatchManager.cleanup();
+            }
+        });
     });
 });

@@ -3,11 +3,11 @@ import { strict as assert } from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, beforeEach, describe, test } from 'node:test';
-import type { JurisInstance, JurisVDOMElement } from '../types/juris';
+import type { j } from '../main';
 import { swaggerPage } from './swagger-page';
 
 describe('Swagger Page Component (DOM Rendering)', () => {
-    let juris: JurisInstance;
+    let juris: j.juris.JurisInstance;
 
     // One-time setup: Create DOM and load Juris
     before(() => {
@@ -33,7 +33,7 @@ describe('Swagger Page Component (DOM Rendering)', () => {
     });
 
     test('should render iframe with correct layout and styling', () => {
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [{ swaggerPage: {} }],
             },
@@ -43,32 +43,27 @@ describe('Swagger Page Component (DOM Rendering)', () => {
         document.body.appendChild(element as Node);
 
         // Verify container
-        const outerDiv = document.querySelector('div');
-        assert.ok(outerDiv);
-        const container = outerDiv.firstElementChild as HTMLElement;
-        assert.ok(container, 'Container should exist');
-        assert.equal(container.style.height, 'calc(100vh - 64px)');
-        assert.equal(container.style.width, '100%');
-        assert.equal(container.style.display, 'flex');
-        assert.equal(container.style.flexDirection, 'column');
+        const container = document.querySelector('div');
+        assert.ok(container, 'Container div should exist');
 
         // Verify iframe exists and has correct attributes
         const iframe = document.querySelector('iframe');
         assert.ok(iframe, 'Iframe should exist in DOM');
-        assert.ok(iframe.src.endsWith('/swagger'), `Expected src to end with /swagger, got ${iframe.src}`);
-        // Happy-DOM may expand flex shorthand to "1 1 0%"
-        assert.ok(iframe.style.flex.includes('1'), `Expected flex to contain 1, got ${iframe.style.flex}`);
+        assert.ok(iframe.src.includes('/api/v1/swagger'), `Expected src to contain /api/v1/swagger, got ${iframe.src}`);
+
+        // Check iframe styles
+        assert.equal(iframe.style.width, '100%', 'Iframe width should be 100%');
+        assert.equal(iframe.style.height, 'calc(100vh - 4rem)', 'Iframe height should be calc(100vh - 4rem)');
+
         // Border style might be empty string, 'none', or 'none none' depending on DOM implementation
         assert.ok(
             iframe.style.border.includes('none') || iframe.style.border === '',
             `Expected border to include 'none' or be '', got '${iframe.style.border}'`,
         );
-        assert.equal(iframe.style.width, '100%');
-        assert.equal(iframe.style.height, '100%');
     });
 
     test('should have correct DOM hierarchy and be stateless', () => {
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [{ swaggerPage: {} }],
             },
@@ -77,13 +72,10 @@ describe('Swagger Page Component (DOM Rendering)', () => {
         const element = juris.objectToHtml(vnode);
         document.body.appendChild(element as Node);
 
-        // Verify hierarchy: outer > container > iframe
-        const container = document.querySelector('div')?.firstElementChild;
-        assert.ok(container, 'Container should exist');
-
-        const children = Array.from(container?.children || []);
-        assert.equal(children.length, 1, 'Container should have 1 child');
-        assert.equal(children[0].tagName, 'IFRAME', 'Child should be iframe');
+        // Verify iframe exists in the page
+        const iframe = document.querySelector('iframe');
+        assert.ok(iframe, 'Iframe should exist');
+        assert.ok(iframe.src.includes('/api/v1/swagger'), 'Iframe should point to swagger endpoint');
 
         // Test statelessness - render again should produce same result
         document.body.innerHTML = '';
@@ -91,7 +83,8 @@ describe('Swagger Page Component (DOM Rendering)', () => {
         document.body.appendChild(element2 as Node);
 
         const iframe2 = document.querySelector('iframe');
-        assert.ok(iframe2?.src.endsWith('/swagger'));
-        assert.ok(iframe2?.style.flex.includes('1'));
+        assert.ok(iframe2?.src.includes('/api/v1/swagger'), `Expected src to contain /api/v1/swagger, got ${iframe2?.src}`);
+        assert.equal(iframe2?.style.width, '100%');
+        assert.equal(iframe2?.style.height, 'calc(100vh - 4rem)');
     });
 });

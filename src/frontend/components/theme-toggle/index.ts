@@ -1,11 +1,10 @@
 /**
- * Theme Switch Component
+ * Theme Toggle Component
  * A beautiful animated theme switch inspired by Scalar's dashboard
  * Juris VDOM component for toggling between light and dark themes
  */
 
-import type { AppComponent } from '../../main';
-import type { StyleObject } from '../../types/juris';
+import type { j } from '../../main';
 import { themeSunMoonIcon } from '../icon';
 
 const THEME_KEY = 'theme';
@@ -53,7 +52,7 @@ function toggleTheme(): 'dark' | 'light' {
 /**
  * Theme Switch Component
  */
-export const themeSwitch: AppComponent = (_props, _ctx) => {
+export const themeToggle: j.Component = (_props, _ctx) => {
     const currentTheme = getThemePreference();
     const isDark = currentTheme === 'dark';
 
@@ -63,7 +62,7 @@ export const themeSwitch: AppComponent = (_props, _ctx) => {
     }
 
     // CSSExtractor Styles using classless theme CSS variables
-    const style: StyleObject = {
+    const style = {
         // Container styles
         width: '38px',
         height: '24px',
@@ -126,11 +125,25 @@ export const themeSwitch: AppComponent = (_props, _ctx) => {
         },
 
         '& .thumb:hover': {
-            filter: 'brightness(1.1)',
+            filter: 'brightness(1.2) contrast(1.05)', // Match icon hover effect
+            transform: 'scale(1.05)', // Match icon scale effect
+        },
+
+        '& .thumb:active': {
+            transform: 'scale(0.95)', // Match icon active/press effect
         },
 
         '& .theme-switch-button[aria-pressed="true"] .thumb': {
             transform: 'translateX(18px)',
+        },
+
+        // When both hover and pressed, combine transforms
+        '& .theme-switch-button[aria-pressed="true"] .thumb:hover': {
+            transform: 'translateX(18px) scale(1.05)',
+        },
+
+        '& .theme-switch-button[aria-pressed="true"] .thumb:active': {
+            transform: 'translateX(18px) scale(0.95)',
         },
 
         '& .theme-icon': {
@@ -182,6 +195,7 @@ export const themeSwitch: AppComponent = (_props, _ctx) => {
                         tabindex: '0',
                         'aria-pressed': isDark.toString(),
                         'aria-label': isDark ? 'Set light mode' : 'Set dark mode',
+                        title: isDark ? 'Switch to light mode' : 'Switch to dark mode',
                         onclick: (e: Event) => {
                             const newTheme = toggleTheme();
                             const button = e.currentTarget as HTMLElement;
@@ -190,6 +204,7 @@ export const themeSwitch: AppComponent = (_props, _ctx) => {
                             // Update button attributes
                             button.setAttribute('aria-pressed', isDarkMode.toString());
                             button.setAttribute('aria-label', isDarkMode ? 'Set light mode' : 'Set dark mode');
+                            button.setAttribute('title', isDarkMode ? 'Switch to light mode' : 'Switch to dark mode');
 
                             // Colors update automatically via CSS variables
                         },
@@ -203,6 +218,7 @@ export const themeSwitch: AppComponent = (_props, _ctx) => {
                                 // Update button attributes
                                 button.setAttribute('aria-pressed', isDarkMode.toString());
                                 button.setAttribute('aria-label', isDarkMode ? 'Set light mode' : 'Set dark mode');
+                                button.setAttribute('title', isDarkMode ? 'Switch to light mode' : 'Switch to dark mode');
 
                                 // Colors update automatically via CSS variables
                             }
@@ -235,7 +251,7 @@ export const themeSwitch: AppComponent = (_props, _ctx) => {
 declare global {
     namespace App {
         interface Components {
-            themeSwitch: Record<string, never>;
+            themeToggle: Record<string, never>;
         }
     }
 }

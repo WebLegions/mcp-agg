@@ -5,7 +5,7 @@
  */
 
 import type { FastifyInstance, FastifyReply, FastifyRequest, FastifySchema } from 'fastify';
-import { getManager } from '../controllers/mcp-controller/config';
+import { getManager } from '../controllers/mcp-controller/config-file';
 import { registerMCPServerTools } from '../controllers/mcp-controller/register';
 import { type JSONRPCMessage, SessionStore } from '../libs/mcp-server';
 import { Env } from '../utils';

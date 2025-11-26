@@ -4,7 +4,7 @@ import { createServer, registerRoutes } from './server';
 
 describe('Health endpoint', () => {
     test('GET /health returns status ok', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -20,7 +20,7 @@ describe('Health endpoint', () => {
     });
 
     test('GET /health includes workers count when in cluster mode', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -36,7 +36,7 @@ describe('Health endpoint', () => {
     });
 
     test('GET /health response matches schema', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({

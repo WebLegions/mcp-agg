@@ -113,15 +113,14 @@ export async function registerSwagger(app: FastifyInstance) {
         },
     );
 
-    // Serve custom Swagger UI HTML with unpkg CDN
     app.get(
         '/api/v1/swagger',
         {
             schema: { hide: true },
         },
         async (_request, reply) => {
-            // reply.type('text/html').send(SWAGGER_PAGE_HTML);
-            reply.type('text/html').send(SCALAR_PAGE_HTML);
+            // The HTML will determine the theme on the client side using localStorage / prefers-color-scheme
+            reply.type('text/html').send(getScalarPageHtml());
         },
     );
 
@@ -129,69 +128,75 @@ export async function registerSwagger(app: FastifyInstance) {
     console.log('OpenAPI spec available at /api/v1/openapi.json (auto-generated from route schemas)');
 }
 
-/*** Swagger UI HTML is not in use ***
-
-const _SWAGGER_PAGE_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="${Env.appName} API Documentation">
-    <title>${Env.appName} - API Documentation</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css">
-    <link rel="stylesheet" href="/theme.css">
-</head>
-<body>
-    <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" crossorigin></script>
-    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" crossorigin></script>
-    <script>
-        window.onload = () => {
-            window.ui = SwaggerUIBundle({
-                url: '/api/v1/openapi.json',
-                dom_id: '#swagger-ui',
-                deepLinking: true,
-                presets: [
-                    SwaggerUIBundle.presets.apis,
-                    SwaggerUIStandalonePreset
-                ],
-                plugins: [
-                    SwaggerUIBundle.plugins.DownloadUrl
-                ],
-                layout: 'StandaloneLayout',
-                queryConfigEnabled: true,
-                validatorUrl: 'https://validator.swagger.io/validator',
-                displayRequestDuration: true,
-                requestInterceptor: (req) => {
-                    // Ensure proper headers for same-origin requests
-                    if (!req.headers['Content-Type']) {
-                        req.headers['Content-Type'] = 'application/json';
-                    }
-                    return req;
-                },
-            });
-        };
-    </script>
-</body>
-</html>`;
-******************/
-
-const SCALAR_PAGE_HTML = `
+function getScalarPageHtml() {
+    return `
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${Env.appName} - API Reference</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; 
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; 
+        style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.scalar.com; 
+        font-src 'self' data: https://cdn.jsdelivr.net https://fonts.scalar.com; 
+        img-src 'self' data: https:; 
+        connect-src 'self' http://localhost:* ws://localhost:*; 
+        frame-src 'self' blob:; 
+        worker-src 'self' blob:; 
+        object-src 'none';">
+    <title>${Env.appName} - API Reference</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 <body>
-  <script
-    id="api-reference"
-    data-url="/api/v1/openapi.json"
-    data-configuration='{"showSidebar":true,"hideModels":true}'></script>
-  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.39.3"></script>
+    <div id="api-reference" 
+        data-url="/api/v1/openapi.json" 
+        data-configuration='{"showSidebar":true,"hideModels":true,"theme":"default","darkMode":true,"layout":"modern"}'>
+    </div>
+
+    <script>
+        // update the above div with current theme
+        function updateTheme(isDark) {
+            const apiRef = document.getElementById('api-reference');
+            if (apiRef) {
+                console.log('[Scalar] dataset:', typeof apiRef.dataset.configuration, apiRef.dataset.configuration);
+                const currentConfig = JSON.parse(apiRef.dataset.configuration);
+                if (currentConfig.darkMode === isDark) return;
+                const newConfig = { ...currentConfig, darkMode: isDark };
+                console.log('[Scalar] newConfig:', newConfig);
+                apiRef.dataset.configuration = JSON.stringify(newConfig);
+            }
+        }
+
+        // update the above div with current theme
+        const isDark = (localStorage.getItem('theme') === 'dark') || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('color-scheme', isDark ? 'dark' : 'light');
+        updateTheme(isDark);
+     </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.25.0"></script>
+
+    <script>
+        console.log('[Scalar] Initializing theme sync...');
+
+        // Listen for theme changes from parent window
+        window.addEventListener('message', (event) => {
+            // Security: Only accept messages from same origin
+            if (event.origin !== window.location.origin) return;
+
+            console.log('[Scalar] Received message:', event.data);
+            if (event.data && event.data.type === 'theme-change') {
+                document.location.reload();
+            }
+        });
+
+        // Send ready message to parent to request initial theme
+        window.addEventListener('load', () => {
+            console.log('[Scalar] Page loaded, sending ready message to parent');
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'scalar-ready' }, window.location.origin);
+            }
+        });
+    </script>
 </body>
-</html>
-`;
+</html>`;
+}

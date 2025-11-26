@@ -16,7 +16,7 @@ describe('HTTP Security Middleware', () => {
         process.env.MAX_URL_LENGTH = '2048';
 
         // Create and start server
-        app = createServer();
+        app = await createServer();
         await registerRoutes(app);
         // Use port 0 to get a random available port
         await app.listen({ port: 0, host: '127.0.0.1' });
@@ -44,6 +44,9 @@ describe('HTTP Security Middleware', () => {
         ok(response.headers.has('strict-transport-security'), 'Should have Strict-Transport-Security header');
 
         ok(response.headers.has('content-security-policy'), 'Should have Content-Security-Policy header');
+        const csp = response.headers.get('content-security-policy');
+        ok(csp?.includes("frame-src 'self' blob:"), 'CSP should allow blob: URLs in frame-src for Scalar downloads');
+        ok(csp?.includes("object-src 'none'"), 'CSP should block object/embed tags');
     });
 
     test('should handle CORS properly', async () => {
@@ -176,7 +179,7 @@ describe('HTTP Security Middleware', () => {
 
         // Close and recreate server with new config
         await app.close();
-        app = createServer();
+        app = await createServer();
         await registerRoutes(app);
         await app.listen({ port: 0, host: '127.0.0.1' });
         const addr = app.server.address();
@@ -203,7 +206,7 @@ describe('HTTP Security Middleware', () => {
         process.env.ALLOWED_HOSTS = 'localhost,127.0.0.1';
 
         await app.close();
-        app = createServer();
+        app = await createServer();
         await registerRoutes(app);
         await app.listen({ port: 0, host: '127.0.0.1' });
         const addr = app.server.address();
@@ -225,7 +228,7 @@ describe('HTTP Security Middleware', () => {
         delete process.env.ALLOWED_HOSTS;
 
         await app.close();
-        app = createServer();
+        app = await createServer();
         await registerRoutes(app);
         await app.listen({ port: 0, host: '127.0.0.1' });
         const addr = app.server.address();
@@ -247,7 +250,7 @@ describe('HTTP Security Middleware', () => {
         process.env.ALLOWED_HOSTS = 'localhost,127.0.0.1,example.local';
 
         await app.close();
-        app = createServer();
+        app = await createServer();
         await registerRoutes(app);
         await app.listen({ port: 0, host: '127.0.0.1' });
         const addr = app.server.address();

@@ -3,14 +3,13 @@
  * Uses JurisJS CSSExtractor for automatic CSS isolation and scoping
  */
 
-import type { AppComponent } from '../../main';
-import type { StyleObject } from '../../types/juris';
+import type { j } from '../../main';
 import type { IconDefinition } from './svg';
 
 export interface IconProps {
     image: IconDefinition;
-    onClick?: () => void;
-    onHover?: () => void;
+    onClick?: (event: MouseEvent | KeyboardEvent) => void;
+    onHover?: (event: MouseEvent) => void;
     ariaLabel: string;
     title?: string;
 }
@@ -24,11 +23,11 @@ export interface IconProps {
  * - Processes media queries (@media)
  * - Caches extracted CSS to avoid duplication
  */
-export const icon: AppComponent<IconProps> = (props, _ctx) => {
+export const icon: j.Component<IconProps> = (props, _ctx) => {
     const { image, onClick, onHover, ariaLabel, title } = props;
-    const hasInteraction = onClick !== undefined;
+    const hasInteraction = onClick !== undefined || onHover !== undefined;
 
-    const style: StyleObject = {
+    const style = {
         // CSSExtractor processes these styles automatically
         // Base styles (static - extracted to <style> tag)
         display: 'inline-block',
@@ -123,20 +122,18 @@ export const icon: AppComponent<IconProps> = (props, _ctx) => {
             title: title || ariaLabel,
             role: hasInteraction ? 'button' : undefined,
             tabindex: hasInteraction ? '0' : undefined,
-            onClick: onClick
-                ? (_e: MouseEvent) => {
+            onClick: hasInteraction
+                ? (e: MouseEvent) => {
                       console.log('[icon] onClick called, hasInteraction:', hasInteraction);
-                      onClick();
+                      onClick?.(e);
                   }
                 : undefined,
-            onMouseEnter: onHover,
+            onMouseEnter: hasInteraction ? (e: MouseEvent) => onHover?.(e) : undefined,
             onkeydown: hasInteraction
                 ? (e: KeyboardEvent) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          if (onClick) {
-                              onClick();
-                          }
+                          onClick?.(e);
                       }
                   }
                 : undefined,

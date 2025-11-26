@@ -9,5 +9,5 @@
  */
 
 export type { MCPServerConfig } from '../../shared/types/mcp-config';
-export { getManager, type MCPConfigManager } from './config';
+export { getManager, type MCPConfigManager } from './config-file';
 export { connectToMCPServer, registerMCPServerTools } from './register';

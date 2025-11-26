@@ -2,11 +2,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 import { Env } from '../../shared/utils/env';
-import type { AppContext } from '../main';
+import type { j } from '../main';
 import { envModal } from './env-modal';
 
 describe('envModal Component', () => {
-    let mockContext: AppContext;
+    let mockContext: j.Context;
     let originalWindowEnv: Record<string, string> | undefined;
 
     beforeEach(() => {
@@ -15,10 +15,10 @@ describe('envModal Component', () => {
             getState: <T>(_key: string, defaultValue?: T): T => defaultValue as T,
             setState: (_key: string, _value: unknown) => {},
             executeBatch: (callback: () => unknown) => callback(),
-            api: {} as AppContext['api'],
-            router: {} as AppContext['router'],
-            config: {} as AppContext['config'],
-        } as AppContext;
+            api: {} as j.Context['api'],
+            router: {} as j.Context['router'],
+            config: {} as j.Context['config'],
+        } as j.Context;
 
         // Save original window.env
         originalWindowEnv = Object(window).env;

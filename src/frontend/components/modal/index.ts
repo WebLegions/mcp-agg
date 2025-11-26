@@ -8,17 +8,16 @@
  * Uses manual backdrop div for styling and click-outside-to-close functionality.
  */
 
-import type { App, AppComponent } from '../../main';
-import type { JurisVDOMElement, ReactiveValue, StyleObject } from '../../types/juris';
+import type { j } from '../../main';
 import { closeIcon, icon } from '../icon';
 
 export interface ModalProps {
     /** Unique ID for the modal element */
     id: string;
     /** Modal title */
-    title?: ReactiveValue<string>;
+    title?: j.ReactiveValue<string>;
     /** Modal message/content (for simple text modals) */
-    message?: ReactiveValue<string>;
+    message?: j.ReactiveValue<string>;
     /**
      * State key that controls modal visibility and captures button response
      * - When empty string: modal is hidden
@@ -27,11 +26,13 @@ export interface ModalProps {
      */
     stateKey: string;
     /** Optional custom content (for extending modals) */
-    children?: JurisVDOMElement[];
+    children?: j.Elem[];
     /** Optional custom footer buttons (for extending modals) */
-    footerButtons?: JurisVDOMElement[];
+    footerButtons?: j.Elem[];
     /** Optional z-index for modal stacking (default: 1000) */
     zIndex?: number;
+    /** Optional max-width for the dialog in rem units (default: 50rem ≈ 800px) */
+    maxWidth?: string;
 }
 
 /**
@@ -54,18 +55,35 @@ export interface ModalProps {
  *   stateKey: 'ui.alert'
  * }, ctx)
  */
-export const modal: AppComponent<ModalProps> = (props, ctx) => {
-    const { id, title = 'Modal', message, stateKey, children, footerButtons, zIndex = 1000 } = props;
+export const modal: j.Component<ModalProps> = (props, ctx) => {
+    const { id, title = 'Modal', message, stateKey, children, footerButtons, zIndex = 1000, maxWidth = '50rem' } = props;
+
+    // ESC key handler using arm() API
+    if (ctx.juris) {
+        ctx.juris.arm(document, (_armCtx) => ({
+            onKeyDown: (e: Event) => {
+                if (e instanceof KeyboardEvent && e.key === 'Escape') {
+                    const currentVisible = ctx.getState(stateKey, '');
+                    if (currentVisible) {
+                        ctx.setState(stateKey, '');
+                    }
+                }
+            },
+        }));
+    }
+
+    // Close modal helper
+    const closeModal = () => {
+        ctx.setState(stateKey, '');
+    };
 
     // Default OK button if no custom buttons provided
-    const defaultFooterButtons: JurisVDOMElement[] = [
+    const defaultFooterButtons: j.Elem[] = [
         {
             button: {
                 type: 'button',
                 text: 'OK',
-                onClick: () => {
-                    ctx.setState(stateKey, '');
-                },
+                onClick: closeModal,
             },
         },
     ];
@@ -73,7 +91,7 @@ export const modal: AppComponent<ModalProps> = (props, ctx) => {
     const finalFooterButtons = footerButtons || defaultFooterButtons;
 
     // Content: either simple message or custom children
-    const modalContent: JurisVDOMElement[] = message
+    const modalContent: j.Elem[] = message
         ? [
               {
                   p: {
@@ -84,7 +102,7 @@ export const modal: AppComponent<ModalProps> = (props, ctx) => {
         : children || [];
 
     // CSSExtractor Styles
-    const style: StyleObject = {
+    const style = {
         // Modal backdrop - fixed overlay
         position: 'fixed',
         top: '0',
@@ -102,7 +120,7 @@ export const modal: AppComponent<ModalProps> = (props, ctx) => {
         // Child selectors for the dialog
         '& .dialog': {
             background: 'var(--card-bg)',
-            maxWidth: '90vw',
+            maxWidth: `min(${maxWidth}, 90vw)`, // User-configurable max-width, capped at 90vw
             maxHeight: '90vh',
             width: '100%',
             padding: '0',
@@ -195,7 +213,7 @@ export const modal: AppComponent<ModalProps> = (props, ctx) => {
                 width: 'auto',
             },
         },
-    };
+    } as const;
 
     return {
         div: {
@@ -205,7 +223,7 @@ export const modal: AppComponent<ModalProps> = (props, ctx) => {
             onClick: (e: Event) => {
                 // Close modal when clicking backdrop (outside dialog)
                 if (e.target === e.currentTarget) {
-                    ctx.setState(stateKey, '');
+                    closeModal();
                 }
             },
             children: [
@@ -231,9 +249,7 @@ export const modal: AppComponent<ModalProps> = (props, ctx) => {
                                         {
                                             icon: {
                                                 image: closeIcon,
-                                                onClick: () => {
-                                                    ctx.setState(stateKey, '');
-                                                },
+                                                onClick: closeModal,
                                                 ariaLabel: 'Close modal',
                                                 title: 'Close',
                                             },
@@ -266,7 +282,7 @@ export const modal: AppComponent<ModalProps> = (props, ctx) => {
 /**
  * Register Modal component with App
  */
-export function registerModal(app: App): void {
+export function registerModal(app: j.App): void {
     app.registerComponent('icon', icon as never);
     app.registerComponent('modal', modal as never);
 }

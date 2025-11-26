@@ -1,73 +1,137 @@
-import type { AppComponent } from '../main';
+import { ApiClient } from '../../shared/libs/api-client';
+import type { HealthResponse } from '../../shared/types/health';
+import { ErrorEx } from '../../shared/utils/error';
+import { capitalize, escapeHTML, labelify } from '../../shared/utils/text';
+import type { j } from '../main';
 
-export const healthPage: AppComponent = (_props, ctx) => {
+export const healthPage: j.Component = async (_props, ctx) => {
     const stateKey = 'health.status';
     const errorKey = 'health.error';
+    const dataKey = 'health.data';
+    const url = `${ctx.api.baseUrl}../../health`;
 
-    // Get current state or initialize
-    let status = ctx.getState(stateKey, '');
-    if (!status) {
-        status = 'loading';
+    //function parse(data: )
+
+
+
+    async function refresh() {
         ctx.setState(stateKey, 'loading');
         ctx.setState(errorKey, '');
-    }
+        try {
+            let text = '';
+            let data: HealthResponse;
 
-    const errorMsg = ctx.getState(errorKey, '');
-
-    // Fetch health status on mount (only if status is loading)
-    if (status === 'loading') {
-        fetch('/health')
-            .then(async (response) => {
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ error: response.statusText }));
-                    ctx.setState(stateKey, 'error');
-                    ctx.setState(errorKey, errorData.error || response.statusText);
+            try {
+                text = await ApiClient.fetch<string>(url, {}, { afterFn: 'text' });
+                console.log('HealthResponse', text);
+                data = JSON.parse(text) as HealthResponse;
+            } catch (e) {
+                const err = new ErrorEx(e);
+                if (err.message.startsWith('JSON') && !!text) {
+                    // something else is answering us. Show it!
+                    data = { status: 'Invalid response' } as HealthResponse;
+                    Object(data)['Response Text'] = escapeHTML(text);
                 } else {
-                    ctx.setState(stateKey, 'ok');
+                    throw err;
                 }
-            })
-            .catch((error: Error) => {
+            }
+            if (data.status === 'ok') {
+                ctx.setState(stateKey, 'ok');
+                ctx.setState(dataKey, JSON.stringify(data, undefined, 2));
+            } else {
                 ctx.setState(stateKey, 'error');
-                ctx.setState(errorKey, error.message || 'Network error');
-            });
+                ctx.setState(errorKey, 'Health check failure.');
+                ctx.setState(dataKey, JSON.stringify(data, undefined, 2));
+            }
+        } catch (e) {
+            const err = new ErrorEx(e);
+            ctx.setState(stateKey, 'error');
+            ctx.setState(errorKey, capitalize(labelify(err.message).toLowerCase()));
+            ctx.setState(dataKey, err.code);
+        }
     }
 
-    const isOk = status === 'ok';
-    const isError = status === 'error';
-    const _isLoading = status === 'loading';
+    // initial load
+    ctx.setState(dataKey, '');
+    ctx.setState(stateKey, 'loading');
+    ctx.setState(errorKey, '');
+    refresh();
+
+    // I failed to inject @keyframes with js code, so hacking it here:
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes blink-fade {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
 
     return {
-        div: {
-            style: {
-                color: 'var(--body-color)',
-            },
+        main: {
             children: [
                 {
-                    h1: {
-                        text: 'System Health',
-                        style: { marginBottom: '1rem' },
+                    header: {
+                        children: [
+                            {
+                                h1: {
+                                    text: 'System Health',
+                                },
+                            },
+                        ],
                     },
                 },
                 {
-                    div: {
-                        style: {
-                            background: 'var(--card-bg)',
-                            border: 'var(--border-color)',
-                            borderRadius: 'var(--border-radius-lg)',
-                        },
+                    section: {
                         children: [
-                            {
-                                span: {
-                                    text: isOk ? '●' : isError ? '●' : '○',
-                                    style: {
-                                        color: isOk ? '#22c55e' : isError ? '#ef4444' : '#6b7280', // Green / Red / Gray
-                                        marginRight: '0.5rem',
+                            () =>
+                                ctx.getState(stateKey, 'loading') === 'loading' && {
+                                    p: {
+                                        id: 'health-page-loading',
+                                        children: [
+                                            {
+                                                span: {
+                                                    text: '●',
+                                                    style: { animation: 'blink-fade 1s steps(1, start) infinite;' },
+                                                },
+                                            },
+                                            {
+                                                span: {
+                                                    text: ' Checking...',
+                                                    style: { color: 'var(--text-muted, #6b7280);' },
+                                                },
+                                            },
+                                        ],
                                     },
+                                },
+                            () =>
+                                ctx.getState(stateKey, '') === 'ok' && {
+                                    p: {
+                                        id: 'health-page-ok',
+                                        text: '● Operational',
+                                        style: { color: `var(--success, #22c55e)` },
+                                    },
+                                },
+                            () =>
+                                ctx.getState(stateKey, '') === 'error' && {
+                                    p: {
+                                        id: 'health-page-error',
+                                        text: `● ${ctx.getState(errorKey, '')}`,
+                                        style: { color: `var(--danger, #ef4444)` },
+                                    },
+                                },
+                            {
+                                pre: {
+                                    id: 'health-page-data',
+                                    text: () => ctx.getState(dataKey, '...'),
                                 },
                             },
                             {
-                                span: {
-                                    text: isOk ? 'All Systems Operational' : isError ? `Error: ${errorMsg}` : 'Checking...',
+                                button: {
+                                    id: 'health-page-refresh-button',
+                                    text: 'Refresh',
+                                    onClick: refresh,
+                                    disabled: () => ctx.getState(stateKey, 'loading') === 'loading',
                                 },
                             },
                         ],

@@ -1,98 +1,76 @@
 /**
  * Juris Type Definitions
- *
- * This file re-exports the base JurisJS types and adds project-specific extensions.
- * The base juris.d.ts file is kept unchanged to preserve the original library types.
+ * Re-exports base JurisJS types from juris.d.ts
  */
-
-// Import types we need to extend or override
-import type {
-    JurisConfig as BaseJurisConfig,
-    JurisInstance as BaseJurisInstance,
-    ComponentState as BaseComponentState,
-    JurisContext as BaseJurisContext,
-    ReactiveValue,
-    JurisVDOMElement as BaseJurisVDOMElement,
-} from './juris.d';
 
 // Re-export all base Juris types
 export * from './juris.d';
 
-// ============================================================================
-// Extended State Management with Improved Type Inference
-// ============================================================================
+// Extended types that need to be available for re-export
+import type {
+    JurisInstance as BaseJurisInstance,
+    JurisVDOMElement as BaseJurisVDOMElement,
+    StyleValue as BaseStyleValue,
+} from './juris.d';
 
 /**
- * Extended ComponentState that prevents literal type inference for primitive defaults
- * Overrides getState to widen primitive literal types (e.g., '/' becomes string, 5 becomes number).
+ * Enhanced VDOM element with registered components first for better
+ * IntelliSense
  */
-// biome-ignore lint/suspicious/noExplicitAny: Type parameter defaults need any for flexibility
-export interface ComponentState<TState = any> extends Omit<BaseComponentState<TState>, 'getState'> {
-    // biome-ignore lint/suspicious/noExplicitAny: Record value type needs any for dynamic state
-    getState: TState extends Record<string, any>
-        ? {
-              // Overloads for primitive types with provided default (prevents literal type inference)
-              (path: string, defaultValue: string, track?: boolean): string;
-              (path: string, defaultValue: number, track?: boolean): number;
-              (path: string, defaultValue: boolean, track?: boolean): boolean;
-              (path: string, defaultValue: bigint, track?: boolean): bigint;
-              // Generic overload for other types (must come last)
-              <T>(path: string, defaultValue?: T, track?: boolean): T;
-          }
-        : {
-              // Overloads for primitive types with provided default (prevents literal type inference)
-              (path: string, defaultValue: string, track?: boolean): string;
-              (path: string, defaultValue: number, track?: boolean): number;
-              (path: string, defaultValue: boolean, track?: boolean): boolean;
-              (path: string, defaultValue: bigint, track?: boolean): bigint;
-              // Generic overload for other types (must come last)
-              <T>(path: string, defaultValue?: T, track?: boolean): T;
-          };
-}
-
-/** Extend JurisContext accordingly */
-// biome-ignore lint/suspicious/noExplicitAny: Type parameter defaults need any for flexibility
-export interface JurisContext<TState = any>
-    extends Omit<BaseJurisContext<TState>, keyof ComponentState<TState>>,
-        ComponentState<TState> {}
+export type JurisVDOMElement =
+    | (keyof Juris.RegisteredComponents extends never
+          ? never
+          : {
+                [K in keyof Juris.RegisteredComponents]: {
+                    [P in K]: Juris.RegisteredComponents[K] & {
+                        children?: JurisTypes.ReactiveValue<JurisVDOMElementEx[]>;
+                        key?: string | number;
+                    };
+                };
+            }[keyof Juris.RegisteredComponents])
+    | BaseJurisVDOMElement;
 
 /**
- * Extended JurisInstance with improved type inference.
- * Note: Using state directly from the juris instance is an anti-pattern.
- * For test code use `juris.createContext().setState()`.
+ * Improved StyleValue type for deeply nested styles
+ * This is a recursive type that allows:
+ * - All CSS properties (via CSSProperties)
+ * - Pseudo-classes, pseudo-elements, media queries (via ExtendedStyleObject features)
+ * - Nested StyleObject for any custom selector
+ * - Reactive values (functions, promises)
  */
+export type StyleValue = {
+    [K in keyof BaseStyleValue]?: BaseStyleValue[K];
+} & {
+    [key: string]: ReactiveValue<string | number> | StyleValue | undefined;
+};
+
 export interface JurisInstance<TState = Record<string, unknown>>
     extends Omit<BaseJurisInstance<TState>, 'getState' | 'setState'> {}
 
-// ============================================================================
-// Extended Juris Configuration
-// ============================================================================
-
 /**
- * Extended JurisConfig with features support for CSSExtractor
- * This extends the base JurisConfig to include the features object
- * as specified in JurisJS v0.9.0 documentation.
+ * Extended JurisInstance with arm() API
  */
-export interface JurisConfig extends Omit<BaseJurisConfig, 'features'> {
-    features?: {
-        cssExtractor?: CSSExtractor;
-        headless?: HeadlessManager;
-        headlessComponents?: Record<string, HeadlessComponent<unknown>>;
-    };
+export interface JurisInstance<TState = Record<string, unknown>> extends BaseJurisInstance<TState> {
+    arm<T extends HTMLElement | Document | Window>(
+        target: T,
+        handlerFn: (context: unknown) => Record<string, (event: Event) => void>,
+    ): ArmedInstance;
+}
+
+export interface ArmedInstance {
+    events: Array<{
+        name: string;
+        actualEvent: string;
+        handler: (event: Event) => void;
+    }>;
+    trigger: (eventName: string, eventData?: Record<string, unknown>) => boolean;
+    cleanup: () => boolean;
 }
 
 export interface JurisConstructor {
-    new <TState = Record<string, unknown>>(config?: JurisConfig): JurisInstance<TState>;
+    new <TState = Record<string, unknown>>(config?: unknown): JurisInstance<TState>;
 }
 
-// ============================================================================
-// Extended Style Types for CSSExtractor
-// ============================================================================
-
-/**
- * CSSExtractor class for automatic CSS isolation
- * Loaded from: https://cdn.jsdelivr.net/npm/juris@0.9.0/juris-cssextractor.js
- */
 export interface CSSExtractor {
     new (): {
         processProps: (props: unknown, elementName: string, domRenderer: unknown) => unknown;
@@ -100,89 +78,6 @@ export interface CSSExtractor {
         clear: () => void;
     };
 }
-
-/**
- * Project-specific StyleObject that extends the base ExtendedStyleObject from juris.d.ts
- *
- * The base ExtendedStyleObject provides predefined pseudo-classes and media queries typed as CSSProperties.
- * This StyleObject adds:
- * - Index signature for any custom selector/media query
- * - Recursive nesting support (nested objects can also contain StyleObject)
- * - Reactive value support (functions, promises)
- *
- * This allows CSSExtractor's full runtime capabilities:
- * - Any pseudo-class/pseudo-element (not just predefined ones)
- * - Any media query with custom breakpoints
- * - Container queries (@container)
- * - Support queries (@supports)
- * - Other at-rules (@layer, @page, etc.)
- * - Deeply nested style structures
- */
-export interface StyleObject extends ExtendedStyleObject {
-    [key: string]: ReactiveValue<string | number> | StyleObject | Record<string, unknown> | undefined;
-}
-
-// ============================================================================
-// Enhanced VDOM Element Type with Strict Component Checking
-// ============================================================================
-
-/**
- * Enhanced JurisVDOMElement that provides better IntelliSense for registered components.
- *
- * This overrides the base JurisVDOMElement to put registered components first in the union,
- * which helps TypeScript's type checker and IDE provide better suggestions and hover info.
- *
- * Note: Due to TypeScript union type behavior, this won't provide strict excess property
- * checking, but it does improve IntelliSense and F12 navigation for registered components.
- *
- * For strict type checking in specific contexts, use explicit type annotations:
- * ```typescript
- * const myIcon: { icon: IconProps } = { icon: { ... } };
- * ```
- */
-export type JurisVDOMElement =
-    // Registered components first (for better IntelliSense priority)
-    | (keyof Juris.RegisteredComponents extends never
-          ? never
-          : {
-                [K in keyof Juris.RegisteredComponents]: {
-                    [P in K]: Juris.RegisteredComponents[K] & {
-                        children?: ReactiveValue<JurisVDOMElement[]>;
-                        key?: string | number;
-                    };
-                };
-            }[keyof Juris.RegisteredComponents])
-    // Standard HTML elements second
-    | BaseJurisVDOMElement;
-
-/**
- * Strict VDOM Element type for when you need compile-time validation.
- *
- * Use this type when you want TypeScript to catch invalid props:
- * ```typescript
- * const strictIcon: StrictVDOMElement<'icon'> = {
- *     icon: {
- *         svg: menuIcon,
- *         ariaLabel: 'test',
- *         // invalidProp: 'error' // ← TypeScript error!
- *     }
- * };
- * ```
- */
-export type StrictVDOMElement<K extends keyof Juris.RegisteredComponents> = {
-    [P in K]: Juris.RegisteredComponents[K] & {
-        children?: ReactiveValue<JurisVDOMElement[]>;
-        key?: string | number;
-    };
-};
-
-// ============================================================================
-// Re-export Application Types
-// ============================================================================
-
-// Re-export AppVDOMElement from main.ts for convenience
-// (Actual definition is in main.ts to keep app-specific types together)
-export type { AppVDOMElement } from '../../main';
 
 // ============================================================================
 // Headless Component Types (from juris-headless.js)
@@ -198,7 +93,7 @@ export interface HeadlessComponent<T = unknown> {
     [key: string]: unknown;
 }
 
-export type HeadlessComponentFunction<T = unknown> = (props: unknown, context: JurisContext) => HeadlessComponent<T>;
+export type HeadlessComponentFunction<T = unknown> = (props: unknown, context: unknown) => HeadlessComponent<T>;
 
 export interface HeadlessManager {
     // biome-ignore lint/suspicious/noMisleadingInstantiator: External library type definition
@@ -349,14 +244,10 @@ export interface RouterAPI {
     getHistory: () => string[];
 }
 
-// ============================================================================
-// Global Type Declarations
-// This is a standard pattern for TypeScript libraries imported into the browser.
-// ============================================================================
-
+// Global declarations for browser-loaded libraries
 declare global {
     const Juris: JurisConstructor;
     const CSSExtractor: CSSExtractor;
-    const Router: HeadlessComponentFn<RouterAPI>;
+    const Router: HeadlessComponentFunction<RouterAPI>;
     const HeadlessManager: HeadlessManager;
 }

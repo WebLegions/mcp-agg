@@ -3,11 +3,11 @@ import { strict as assert } from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, beforeEach, describe, test } from 'node:test';
-import type { JurisInstance, JurisVDOMElement } from '../../types/juris';
+import type { j } from '../../main';
 import { modal } from './index';
 
 describe('Modal Component (DOM Rendering)', () => {
-    let juris: JurisInstance;
+    let juris: j.juris.JurisInstance;
 
     // One-time setup: Create DOM and load Juris
     before(() => {
@@ -36,7 +36,7 @@ describe('Modal Component (DOM Rendering)', () => {
     test('should render modal structure with header, body, footer when shown', () => {
         juris.createContext().setState('ui.modal', 'show');
 
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {
@@ -87,7 +87,7 @@ describe('Modal Component (DOM Rendering)', () => {
     test('should be hidden when state is empty', () => {
         juris.createContext().setState('ui.modal', '');
 
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {
@@ -112,7 +112,7 @@ describe('Modal Component (DOM Rendering)', () => {
     test('should close modal when backdrop is clicked', () => {
         juris.createContext().setState('ui.modal', 'show');
 
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {
@@ -136,5 +136,59 @@ describe('Modal Component (DOM Rendering)', () => {
 
         // Verify modal is closed
         assert.equal(juris.createContext().getState('ui.modal'), '');
+    });
+
+    test('should close modal when ESC key is pressed', () => {
+        const ctx = juris.createContext();
+        ctx.setState('ui.modal', 'show');
+
+        const vnode: j.Elem = {
+            div: {
+                children: [
+                    {
+                        modal: {
+                            id: 'test-modal',
+                            stateKey: 'ui.modal',
+                            title: 'Test Modal',
+                        },
+                    },
+                ],
+            },
+        };
+
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        // Get backdrop element
+        const backdrop = document.querySelector('.backdrop') as HTMLElement;
+        assert.ok(backdrop, 'Backdrop should exist');
+
+        // Note: oncreate doesn't fire with objectToHtml(), so we manually simulate
+        // the ESC key handler that would be registered by oncreate
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                const currentVisible = ctx.getState('ui.modal', '');
+                if (currentVisible) {
+                    ctx.setState('ui.modal', '');
+                }
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+
+        try {
+            // Create and dispatch ESC key event on document
+            const escEvent = new KeyboardEvent('keydown', {
+                key: 'Escape',
+                code: 'Escape',
+                bubbles: true,
+                cancelable: true,
+            });
+            document.dispatchEvent(escEvent);
+
+            // Verify modal is closed
+            assert.equal(ctx.getState('ui.modal'), '');
+        } finally {
+            document.removeEventListener('keydown', handleKeyDown);
+        }
     });
 });

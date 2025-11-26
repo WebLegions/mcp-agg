@@ -3,11 +3,11 @@ import { strict as assert } from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, beforeEach, describe, test } from 'node:test';
-import type { JurisInstance, JurisVDOMElement } from '../../types/juris';
+import type { j } from '../../main';
 import { icon } from './index';
 
 describe('Icon Component (DOM Rendering)', () => {
-    let juris: JurisInstance;
+    let juris: j.juris.JurisInstance;
 
     const mockSvg = {
         viewBox: '0 0 24 24',
@@ -56,7 +56,7 @@ describe('Icon Component (DOM Rendering)', () => {
     });
 
     test('should render icon with SVG and proper accessibility attributes', () => {
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {
@@ -103,7 +103,7 @@ describe('Icon Component (DOM Rendering)', () => {
             clickCount++;
         };
 
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {
@@ -155,7 +155,7 @@ describe('Icon Component (DOM Rendering)', () => {
             hoverCount++;
         };
 
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {

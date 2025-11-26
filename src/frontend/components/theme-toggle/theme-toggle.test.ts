@@ -3,11 +3,11 @@ import { strict as assert } from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, beforeEach, describe, test } from 'node:test';
-import type { JurisInstance, JurisVDOMElement } from '../../types/juris';
-import { themeSwitch } from '.';
+import type { j } from '../../main';
+import { themeToggle } from '.';
 
 describe('ThemeSwitch Component (DOM Rendering)', () => {
-    let juris: JurisInstance;
+    let juris: j.juris.JurisInstance;
 
     // One-time setup: Create DOM and load Juris
     before(() => {
@@ -24,7 +24,7 @@ describe('ThemeSwitch Component (DOM Rendering)', () => {
         Object(window).eval(jurisCode);
 
         juris = new Juris({ states: {} });
-        juris.registerComponent('themeSwitch', themeSwitch as never);
+        juris.registerComponent('themeToggle', themeToggle as never);
     });
 
     // Before each test: Clear the body and reset theme
@@ -35,9 +35,9 @@ describe('ThemeSwitch Component (DOM Rendering)', () => {
     });
 
     test('should render complete theme switch structure with button, track, thumb, and SVG icon', () => {
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
-                children: [{ themeSwitch: {} }],
+                children: [{ themeToggle: {} }],
             },
         };
 
@@ -82,9 +82,9 @@ describe('ThemeSwitch Component (DOM Rendering)', () => {
         // Start with light theme
         localStorage.setItem('theme', 'light');
 
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
-                children: [{ themeSwitch: {} }],
+                children: [{ themeToggle: {} }],
             },
         };
 
@@ -117,9 +117,9 @@ describe('ThemeSwitch Component (DOM Rendering)', () => {
     });
 
     test('should default to light theme and handle keyboard interaction', () => {
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
-                children: [{ themeSwitch: {} }],
+                children: [{ themeToggle: {} }],
             },
         };
 

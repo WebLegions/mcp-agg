@@ -2,12 +2,13 @@
  * Centralized application state structure
  */
 
-export const initialState = {
+export const APP_STATE = {
     servers: {
         items: [],
         loading: true,
         error: '',
         menuId: '',
+        menuXY: { x: 0, y: 0 },
     },
     ui: {
         showEnvModal: false, // 'ui.showEnvModal'

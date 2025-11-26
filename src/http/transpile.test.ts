@@ -82,7 +82,7 @@ describe('Transpile endpoint', () => {
     let app: Awaited<ReturnType<typeof createServer>>;
 
     beforeEach(async () => {
-        app = createServer();
+        app = await createServer();
         await registerRoutes(app);
         await app.ready();
     });
@@ -94,12 +94,12 @@ describe('Transpile endpoint', () => {
     test('should transpile TypeScript to JavaScript', async () => {
         const res = await app.inject({
             method: 'GET',
-            url: '/app/components/theme-switch/index.ts',
+            url: '/app/components/theme-toggle/index.ts',
         });
 
         assert.equal(res.statusCode, 200);
         assert.equal(res.headers['content-type'], 'application/javascript; charset=utf-8');
-        assert.ok(res.body.includes('themeSwitch'));
+        assert.ok(res.body.includes('themeToggle'));
         // Should not contain TypeScript-specific syntax like type annotations
         assert.ok(!res.body.includes(': void'));
     });
@@ -107,23 +107,23 @@ describe('Transpile endpoint', () => {
     test('should minify when query param is true', async () => {
         const res = await app.inject({
             method: 'GET',
-            url: '/app/components/theme-switch/index.ts?minify=true',
+            url: '/app/components/theme-toggle/index.ts?minify=true',
         });
 
         assert.equal(res.statusCode, 200);
         // Minified code should have no extra whitespace between statements
-        assert.ok(res.body.includes('themeSwitch'));
+        assert.ok(res.body.includes('themeToggle'));
     });
 
     test('should not minify when query param is false', async () => {
         const res = await app.inject({
             method: 'GET',
-            url: '/app/components/theme-switch/index.ts?minify=false',
+            url: '/app/components/theme-toggle/index.ts?minify=false',
         });
 
         assert.equal(res.statusCode, 200);
         // Non-minified code should have readable formatting
-        assert.ok(res.body.includes('themeSwitch'));
+        assert.ok(res.body.includes('themeToggle'));
     });
 
     test('should serve CSS files', async () => {
@@ -249,7 +249,7 @@ describe('Transpile endpoint', () => {
     test('should include Cache-Control header', async () => {
         const res = await app.inject({
             method: 'GET',
-            url: '/app/components/theme-switch/index.ts',
+            url: '/app/components/theme-toggle/index.ts',
         });
 
         assert.equal(res.statusCode, 200);
@@ -260,7 +260,7 @@ describe('Transpile endpoint', () => {
     test('should return correct MIME type for TypeScript', async () => {
         const res = await app.inject({
             method: 'GET',
-            url: '/app/components/theme-switch/index.ts',
+            url: '/app/components/theme-toggle/index.ts',
         });
 
         assert.equal(res.headers['content-type'], 'application/javascript; charset=utf-8');

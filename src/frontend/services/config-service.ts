@@ -1,15 +1,13 @@
 import { z } from '../../shared/libs/validator';
 import type { MCPServerConfig } from '../../shared/types/mcp-config';
 import { mcpServerConfigSchema } from '../../shared/types/mcp-config';
-import type { AppContext } from '../main';
-import type { HeadlessComponentFunction, JurisContext } from '../types/juris';
+import type { j } from '../main';
 
 /**
- * Service for managing MCP server configurations
- * Handles all server CRUD operations and state management
+ * Service for managing MCP server CRUD operations
  */
 export class ConfigService {
-    constructor(private _ctx: AppContext) {}
+    constructor(private _ctx: j.Context) { }
 
     async loadServers(): Promise<void> {
         try {
@@ -20,8 +18,8 @@ export class ConfigService {
             this._ctx.setState('servers.items', data.servers || []);
             this._ctx.setState('servers.loading', false);
         } catch (error) {
-            console.error('Failed to load servers:', error);
-            this._ctx.setState('servers.error', (error as Error).message);
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            this._ctx.setState('servers.error', errorMsg);
             this._ctx.setState('servers.loading', false);
         }
     }
@@ -42,20 +40,20 @@ export class ConfigService {
         const serverConfig: unknown =
             transport === 'stdio'
                 ? {
-                      name,
-                      transport: 'stdio',
-                      command,
-                      args: argsStr ? argsStr.split(/\s+/).filter((a) => a.length > 0) : undefined,
-                      enabled,
-                      description: description || undefined,
-                  }
+                    name,
+                    transport: 'stdio',
+                    command,
+                    args: argsStr ? argsStr.split(/\s+/).filter((a) => a.length > 0) : undefined,
+                    enabled,
+                    description: description || undefined,
+                }
                 : {
-                      name,
-                      transport,
-                      url,
-                      enabled,
-                      description: description || undefined,
-                  };
+                    name,
+                    transport,
+                    url,
+                    enabled,
+                    description: description || undefined,
+                };
 
         // Validate using MCPServerConfigSchema
         const result = z.safeParse(mcpServerConfigSchema, serverConfig);
@@ -90,11 +88,11 @@ export class ConfigService {
         }
     }
 
-    async enableServer(name: string, currentEnabled: boolean): Promise<void> {
+    async setServerEnabled(name: string, enabled: boolean): Promise<void> {
         try {
             await this._ctx.api.fetch(`config/${name}/enabled`, {
                 method: 'PATCH',
-                body: JSON.stringify({ enabled: !currentEnabled }),
+                body: JSON.stringify({ enabled }),
             });
             await this.loadServers();
         } catch (error) {
@@ -122,8 +120,8 @@ export class ConfigService {
      * This allows ConfigService to be used directly in headlessComponents registration
      * Returns { api: service } - HeadlessManager extracts 'api' and assigns to ctx[key] where key='config'
      */
-    static headless: HeadlessComponentFunction<ConfigService> = (_props: unknown, ctx: JurisContext) => {
-        const service = new ConfigService(ctx as AppContext);
+    static headless: j.juris.HeadlessComponentFunction<ConfigService> = (_props: unknown, ctx: unknown) => {
+        const service = new ConfigService(ctx as j.Context);
         return {
             api: service,
         };

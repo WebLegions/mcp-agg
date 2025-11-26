@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { getCluster } from '../cluster';
-import { z } from '../shared/libs/validator';
+import { healthResponseSchema } from '../shared/types/health';
 import type { RouteSchema } from './route-types';
 
 /**
@@ -13,11 +13,7 @@ export function registerHealth(app: FastifyInstance) {
         description: 'Returns server health status and timestamp',
         tags: ['Monitoring'],
         response: {
-            200: z.object({
-                status: z.string().describe('Health status'),
-                timestamp: z.string().describe('Current server timestamp in ISO 8601 format'),
-                workers: z.number().optional().describe('Number of active worker processes (only in cluster mode)'),
-            }),
+            200: healthResponseSchema,
         },
     };
 

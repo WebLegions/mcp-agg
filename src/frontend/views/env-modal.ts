@@ -1,8 +1,8 @@
 import { Env } from '../../shared/utils/env';
 import { modal } from '../components/modal';
-import type { AppComponent } from '../main';
+import type { j } from '../main';
 
-export const envModal: AppComponent = (_props, ctx) => {
+export const envModal: j.Component = (_props, ctx) => {
     // Build environment info display
     const envInfo = [
         `Runtime: ${Env.runtime} `,

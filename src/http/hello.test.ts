@@ -4,7 +4,7 @@ import { createServer, registerRoutes } from './server';
 
 describe('Hello endpoint', () => {
     test('GET /api/v1/hello formats number successfully', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -19,7 +19,7 @@ describe('Hello endpoint', () => {
     });
 
     test('GET /api/v1/hello validates query parameters', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -32,7 +32,7 @@ describe('Hello endpoint', () => {
     });
 
     test('GET /api/v1/hello rejects invalid locale format', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -44,7 +44,7 @@ describe('Hello endpoint', () => {
     });
 
     test('POST /api/v1/hello formats number successfully', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -63,7 +63,7 @@ describe('Hello endpoint', () => {
     });
 
     test('POST /api/v1/hello validates request schema', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -79,7 +79,7 @@ describe('Hello endpoint', () => {
     });
 
     test('POST /api/v1/hello rejects invalid locale format', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({

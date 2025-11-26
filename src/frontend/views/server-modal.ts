@@ -1,16 +1,15 @@
 /**
  * Server Modal View
- * Form for creating/editing MCP servers using semantic HTML and ValidatorInput
- * Uses ValidatorInput component for automatic validation from schemas
+ * Form for creating/editing MCP servers using semantic HTML and FormInput
+ * Uses FormInput component for automatic validation from schemas
  * Extends Modal for consistent modal behavior using native <dialog> element
  */
 
 import { mcpHTTPServerSchema, mcpSSEServerSchema, mcpStdioServerSchema } from '../../shared/types/mcp-config';
 import { slugify } from '../../shared/utils/text';
+import { extractFieldValidators, formInput } from '../components/form-input';
 import { modal } from '../components/modal';
-import { extractFieldValidators, ValidatorInput } from '../components/validator-input';
-import type { AppComponent } from '../main';
-import type { JurisVDOMElement } from '../types/juris';
+import type { j } from '../main';
 
 /**
  * Get schema for specific transport type
@@ -26,8 +25,8 @@ function getSchemaForTransport(transport: string) {
     }
 }
 
-export const serverModal: AppComponent = (_props, ctx) => {
-    const modalMode = ctx.getState<string>('serverModal.mode', 'create');
+export const serverModal: j.Component = (_props, ctx) => {
+    const modalMode = ctx.getState<string>('ui.serverModalMode', 'create');
 
     // Validate form and update state
     const validateForm = () => {
@@ -79,12 +78,12 @@ export const serverModal: AppComponent = (_props, ctx) => {
 
     // Helper function to build form fields based on current transport
     // This will be called reactively when transport changes
-    const buildFormFields = (): JurisVDOMElement[] => {
+    const buildFormFields = (): j.Elem[] => {
         const currentTransport = ctx.getState<string>('serverModal.transport.value', 'stdio');
         const schema = getSchemaForTransport(currentTransport);
         const validators = extractFieldValidators(schema);
 
-        const fields: JurisVDOMElement[] = [];
+        const fields: j.Elem[] = [];
 
         // 1. Transport field (dropdown selector) - First field, auto-focused
         fields.push({
@@ -131,54 +130,64 @@ export const serverModal: AppComponent = (_props, ctx) => {
         // Transport-specific fields
         if (currentTransport === 'stdio') {
             fields.push(
-                ValidatorInput({
+                formInput(
+                    {
+                        form: 'serverModal',
+                        name: 'command',
+                        validator: validators.command,
+                        onBlur: handleCommandBlur,
+                    },
                     ctx,
-                    form: 'serverModal',
-                    name: 'command',
-                    validator: validators.command,
-                    onBlur: handleCommandBlur,
-                }),
+                ),
             );
 
             fields.push(
-                ValidatorInput({
+                formInput(
+                    {
+                        form: 'serverModal',
+                        name: 'args',
+                        validator: validators.args,
+                    },
                     ctx,
-                    form: 'serverModal',
-                    name: 'args',
-                    validator: validators.args,
-                }),
+                ),
             );
         } else {
             fields.push(
-                ValidatorInput({
+                formInput(
+                    {
+                        form: 'serverModal',
+                        name: 'url',
+                        validator: validators.url,
+                        onBlur: handleUrlBlur,
+                        autocomplete: 'url',
+                    },
                     ctx,
-                    form: 'serverModal',
-                    name: 'url',
-                    validator: validators.url,
-                    onBlur: handleUrlBlur,
-                    autocomplete: 'url',
-                }),
+                ),
             );
         }
 
         fields.push(
-            ValidatorInput({
+            formInput(
+                {
+                    form: 'serverModal',
+                    name: 'name',
+                    validator: validators.name,
+                    disabled: modalMode === 'edit',
+                    // autoFocus removed as Transport is now first
+                },
                 ctx,
-                form: 'serverModal',
-                name: 'name',
-                validator: validators.name,
-                disabled: modalMode === 'edit',
-                // autoFocus removed as Transport is now first
-            }),
+            ),
         );
 
         fields.push(
-            ValidatorInput({
+            formInput(
+                {
+                    form: 'serverModal',
+                    name: 'description',
+                    validator: validators.description,
+                },
                 ctx,
-                form: 'serverModal',
-                name: 'description',
-                validator: validators.description,
-            }),
+            ),
         );
 
         return fields;
@@ -201,13 +210,18 @@ export const serverModal: AppComponent = (_props, ctx) => {
             return;
         }
 
-        // Submit form
-        await ctx.config.saveServer();
+        // Submit form - call create or update based on modal mode
+        const mode = ctx.getState<string>('ui.serverModalMode', 'create');
+        if (mode === 'create') {
+            await ctx.config.create();
+        } else {
+            await ctx.config.update();
+        }
     };
 
     // Modal content: form with fields
     // Build fields on every render so they update when transport changes
-    const modalContent: JurisVDOMElement[] = [
+    const modalContent: j.Elem[] = [
         {
             form: {
                 // Pass function to children for reactive updates
@@ -219,7 +233,7 @@ export const serverModal: AppComponent = (_props, ctx) => {
     ];
 
     // Modal footer buttons
-    const footerButtons: JurisVDOMElement[] = [
+    const footerButtons: j.Elem[] = [
         {
             button: {
                 type: 'button',
@@ -246,7 +260,7 @@ export const serverModal: AppComponent = (_props, ctx) => {
     return modal(
         {
             id: 'server-modal',
-            title: () => (ctx.getState('serverModal.mode') === 'create' ? 'Add New Server' : 'Edit Server'),
+            title: () => (ctx.getState('ui.serverModalMode') === 'create' ? 'Add New Server' : 'Edit Server'),
             stateKey: 'ui.showServerModal',
             children: modalContent,
             footerButtons,

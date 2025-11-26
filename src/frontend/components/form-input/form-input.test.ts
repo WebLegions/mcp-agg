@@ -7,7 +7,7 @@ import { describe, test } from 'node:test';
 import { z } from '../../../shared/libs/validator';
 import { extractFieldValidators } from '.';
 
-describe('validator-input', () => {
+describe('form-input', () => {
     describe('extractFieldValidators', () => {
         test('extracts field validators from object schema', () => {
             const schema = z.object({

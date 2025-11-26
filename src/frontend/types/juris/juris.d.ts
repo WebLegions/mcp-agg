@@ -1237,188 +1237,188 @@ interface CSSProperties
 // Extended style interface with nested selectors, media queries, and at-rules
 interface ExtendedStyleObject extends CSSProperties {
     // Pseudo-classes
-    ':hover'?: CSSProperties;
-    ':focus'?: CSSProperties;
-    ':focus-visible'?: CSSProperties;
-    ':focus-within'?: CSSProperties;
-    ':active'?: CSSProperties;
-    ':visited'?: CSSProperties;
-    ':link'?: CSSProperties;
-    ':target'?: CSSProperties;
-    ':target-within'?: CSSProperties;
-    ':scope'?: CSSProperties;
-    ':current'?: CSSProperties;
-    ':past'?: CSSProperties;
-    ':future'?: CSSProperties;
-    ':playing'?: CSSProperties;
-    ':paused'?: CSSProperties;
-    ':seeking'?: CSSProperties;
-    ':buffering'?: CSSProperties;
-    ':stalled'?: CSSProperties;
-    ':muted'?: CSSProperties;
-    ':volume-locked'?: CSSProperties;
-    ':fullscreen'?: CSSProperties;
-    ':picture-in-picture'?: CSSProperties;
-    ':user-invalid'?: CSSProperties;
-    ':user-valid'?: CSSProperties;
-    ':enabled'?: CSSProperties;
-    ':disabled'?: CSSProperties;
-    ':read-only'?: CSSProperties;
-    ':read-write'?: CSSProperties;
-    ':placeholder-shown'?: CSSProperties;
-    ':default'?: CSSProperties;
-    ':checked'?: CSSProperties;
-    ':indeterminate'?: CSSProperties;
-    ':blank'?: CSSProperties;
-    ':empty'?: CSSProperties;
-    ':valid'?: CSSProperties;
-    ':invalid'?: CSSProperties;
-    ':in-range'?: CSSProperties;
-    ':out-of-range'?: CSSProperties;
-    ':required'?: CSSProperties;
-    ':optional'?: CSSProperties;
-    ':autofill'?: CSSProperties;
-    ':root'?: CSSProperties;
-    ':defined'?: CSSProperties;
-    ':host'?: CSSProperties;
-    ':host-context'?: CSSProperties;
+    ':hover'?: ExtendedStyleObject;
+    ':focus'?: ExtendedStyleObject;
+    ':focus-visible'?: ExtendedStyleObject;
+    ':focus-within'?: ExtendedStyleObject;
+    ':active'?: ExtendedStyleObject;
+    ':visited'?: ExtendedStyleObject;
+    ':link'?: ExtendedStyleObject;
+    ':target'?: ExtendedStyleObject;
+    ':target-within'?: ExtendedStyleObject;
+    ':scope'?: ExtendedStyleObject;
+    ':current'?: ExtendedStyleObject;
+    ':past'?: ExtendedStyleObject;
+    ':future'?: ExtendedStyleObject;
+    ':playing'?: ExtendedStyleObject;
+    ':paused'?: ExtendedStyleObject;
+    ':seeking'?: ExtendedStyleObject;
+    ':buffering'?: ExtendedStyleObject;
+    ':stalled'?: ExtendedStyleObject;
+    ':muted'?: ExtendedStyleObject;
+    ':volume-locked'?: ExtendedStyleObject;
+    ':fullscreen'?: ExtendedStyleObject;
+    ':picture-in-picture'?: ExtendedStyleObject;
+    ':user-invalid'?: ExtendedStyleObject;
+    ':user-valid'?: ExtendedStyleObject;
+    ':enabled'?: ExtendedStyleObject;
+    ':disabled'?: ExtendedStyleObject;
+    ':read-only'?: ExtendedStyleObject;
+    ':read-write'?: ExtendedStyleObject;
+    ':placeholder-shown'?: ExtendedStyleObject;
+    ':default'?: ExtendedStyleObject;
+    ':checked'?: ExtendedStyleObject;
+    ':indeterminate'?: ExtendedStyleObject;
+    ':blank'?: ExtendedStyleObject;
+    ':empty'?: ExtendedStyleObject;
+    ':valid'?: ExtendedStyleObject;
+    ':invalid'?: ExtendedStyleObject;
+    ':in-range'?: ExtendedStyleObject;
+    ':out-of-range'?: ExtendedStyleObject;
+    ':required'?: ExtendedStyleObject;
+    ':optional'?: ExtendedStyleObject;
+    ':autofill'?: ExtendedStyleObject;
+    ':root'?: ExtendedStyleObject;
+    ':defined'?: ExtendedStyleObject;
+    ':host'?: ExtendedStyleObject;
+    ':host-context'?: ExtendedStyleObject;
 
     // Structural pseudo-classes
-    ':first-child'?: CSSProperties;
-    ':last-child'?: CSSProperties;
-    ':only-child'?: CSSProperties;
-    ':first-of-type'?: CSSProperties;
-    ':last-of-type'?: CSSProperties;
-    ':only-of-type'?: CSSProperties;
-    ':nth-child(n)'?: CSSProperties;
-    ':nth-last-child(n)'?: CSSProperties;
-    ':nth-of-type(n)'?: CSSProperties;
-    ':nth-last-of-type(n)'?: CSSProperties;
+    ':first-child'?: ExtendedStyleObject;
+    ':last-child'?: ExtendedStyleObject;
+    ':only-child'?: ExtendedStyleObject;
+    ':first-of-type'?: ExtendedStyleObject;
+    ':last-of-type'?: ExtendedStyleObject;
+    ':only-of-type'?: ExtendedStyleObject;
+    ':nth-child(n)'?: ExtendedStyleObject;
+    ':nth-last-child(n)'?: ExtendedStyleObject;
+    ':nth-of-type(n)'?: ExtendedStyleObject;
+    ':nth-last-of-type(n)'?: ExtendedStyleObject;
 
     // Pseudo-elements
-    '::before'?: CSSProperties;
-    '::after'?: CSSProperties;
-    '::first-line'?: CSSProperties;
-    '::first-letter'?: CSSProperties;
-    '::selection'?: CSSProperties;
-    '::backdrop'?: CSSProperties;
-    '::placeholder'?: CSSProperties;
-    '::marker'?: CSSProperties;
-    '::spelling-error'?: CSSProperties;
-    '::grammar-error'?: CSSProperties;
-    '::file-selector-button'?: CSSProperties;
-    '::cue'?: CSSProperties;
-    '::cue-region'?: CSSProperties;
-    '::part'?: CSSProperties;
-    '::slotted'?: CSSProperties;
-    '::highlight'?: CSSProperties;
-    '::view-transition'?: CSSProperties;
-    '::view-transition-group'?: CSSProperties;
-    '::view-transition-image-pair'?: CSSProperties;
-    '::view-transition-old'?: CSSProperties;
-    '::view-transition-new'?: CSSProperties;
+    '::before'?: ExtendedStyleObject;
+    '::after'?: ExtendedStyleObject;
+    '::first-line'?: ExtendedStyleObject;
+    '::first-letter'?: ExtendedStyleObject;
+    '::selection'?: ExtendedStyleObject;
+    '::backdrop'?: ExtendedStyleObject;
+    '::placeholder'?: ExtendedStyleObject;
+    '::marker'?: ExtendedStyleObject;
+    '::spelling-error'?: ExtendedStyleObject;
+    '::grammar-error'?: ExtendedStyleObject;
+    '::file-selector-button'?: ExtendedStyleObject;
+    '::cue'?: ExtendedStyleObject;
+    '::cue-region'?: ExtendedStyleObject;
+    '::part'?: ExtendedStyleObject;
+    '::slotted'?: ExtendedStyleObject;
+    '::highlight'?: ExtendedStyleObject;
+    '::view-transition'?: ExtendedStyleObject;
+    '::view-transition-group'?: ExtendedStyleObject;
+    '::view-transition-image-pair'?: ExtendedStyleObject;
+    '::view-transition-old'?: ExtendedStyleObject;
+    '::view-transition-new'?: ExtendedStyleObject;
 
     // Media queries
-    '@media screen'?: CSSProperties;
-    '@media print'?: CSSProperties;
-    '@media (max-width: 767px)'?: CSSProperties;
-    '@media (min-width: 768px)'?: CSSProperties;
-    '@media (max-width: 1023px)'?: CSSProperties;
-    '@media (min-width: 1024px)'?: CSSProperties;
-    '@media (max-width: 1199px)'?: CSSProperties;
-    '@media (min-width: 1200px)'?: CSSProperties;
-    '@media (max-width: 1399px)'?: CSSProperties;
-    '@media (min-width: 1400px)'?: CSSProperties;
-    '@media (orientation: portrait)'?: CSSProperties;
-    '@media (orientation: landscape)'?: CSSProperties;
-    '@media (prefers-color-scheme: light)'?: CSSProperties;
-    '@media (prefers-color-scheme: dark)'?: CSSProperties;
-    '@media (prefers-reduced-motion: no-preference)'?: CSSProperties;
-    '@media (prefers-reduced-motion: reduce)'?: CSSProperties;
-    '@media (prefers-contrast: no-preference)'?: CSSProperties;
-    '@media (prefers-contrast: more)'?: CSSProperties;
-    '@media (prefers-contrast: less)'?: CSSProperties;
-    '@media (prefers-reduced-data: no-preference)'?: CSSProperties;
-    '@media (prefers-reduced-data: reduce)'?: CSSProperties;
-    '@media (prefers-reduced-transparency: no-preference)'?: CSSProperties;
-    '@media (prefers-reduced-transparency: reduce)'?: CSSProperties;
-    '@media (forced-colors: none)'?: CSSProperties;
-    '@media (forced-colors: active)'?: CSSProperties;
-    '@media (hover: hover)'?: CSSProperties;
-    '@media (hover: none)'?: CSSProperties;
-    '@media (any-hover: hover)'?: CSSProperties;
-    '@media (any-hover: none)'?: CSSProperties;
-    '@media (pointer: fine)'?: CSSProperties;
-    '@media (pointer: coarse)'?: CSSProperties;
-    '@media (pointer: none)'?: CSSProperties;
-    '@media (any-pointer: fine)'?: CSSProperties;
-    '@media (any-pointer: coarse)'?: CSSProperties;
-    '@media (any-pointer: none)'?: CSSProperties;
-    '@media (update: fast)'?: CSSProperties;
-    '@media (update: slow)'?: CSSProperties;
-    '@media (update: none)'?: CSSProperties;
-    '@media (overflow-block: none)'?: CSSProperties;
-    '@media (overflow-block: scroll)'?: CSSProperties;
-    '@media (overflow-block: optional-paged)'?: CSSProperties;
-    '@media (overflow-block: paged)'?: CSSProperties;
-    '@media (overflow-inline: none)'?: CSSProperties;
-    '@media (overflow-inline: scroll)'?: CSSProperties;
+    '@media screen'?: ExtendedStyleObject;
+    '@media print'?: ExtendedStyleObject;
+    '@media (max-width: 767px)'?: ExtendedStyleObject;
+    '@media (min-width: 768px)'?: ExtendedStyleObject;
+    '@media (max-width: 1023px)'?: ExtendedStyleObject;
+    '@media (min-width: 1024px)'?: ExtendedStyleObject;
+    '@media (max-width: 1199px)'?: ExtendedStyleObject;
+    '@media (min-width: 1200px)'?: ExtendedStyleObject;
+    '@media (max-width: 1399px)'?: ExtendedStyleObject;
+    '@media (min-width: 1400px)'?: ExtendedStyleObject;
+    '@media (orientation: portrait)'?: ExtendedStyleObject;
+    '@media (orientation: landscape)'?: ExtendedStyleObject;
+    '@media (prefers-color-scheme: light)'?: ExtendedStyleObject;
+    '@media (prefers-color-scheme: dark)'?: ExtendedStyleObject;
+    '@media (prefers-reduced-motion: no-preference)'?: ExtendedStyleObject;
+    '@media (prefers-reduced-motion: reduce)'?: ExtendedStyleObject;
+    '@media (prefers-contrast: no-preference)'?: ExtendedStyleObject;
+    '@media (prefers-contrast: more)'?: ExtendedStyleObject;
+    '@media (prefers-contrast: less)'?: ExtendedStyleObject;
+    '@media (prefers-reduced-data: no-preference)'?: ExtendedStyleObject;
+    '@media (prefers-reduced-data: reduce)'?: ExtendedStyleObject;
+    '@media (prefers-reduced-transparency: no-preference)'?: ExtendedStyleObject;
+    '@media (prefers-reduced-transparency: reduce)'?: ExtendedStyleObject;
+    '@media (forced-colors: none)'?: ExtendedStyleObject;
+    '@media (forced-colors: active)'?: ExtendedStyleObject;
+    '@media (hover: hover)'?: ExtendedStyleObject;
+    '@media (hover: none)'?: ExtendedStyleObject;
+    '@media (any-hover: hover)'?: ExtendedStyleObject;
+    '@media (any-hover: none)'?: ExtendedStyleObject;
+    '@media (pointer: fine)'?: ExtendedStyleObject;
+    '@media (pointer: coarse)'?: ExtendedStyleObject;
+    '@media (pointer: none)'?: ExtendedStyleObject;
+    '@media (any-pointer: fine)'?: ExtendedStyleObject;
+    '@media (any-pointer: coarse)'?: ExtendedStyleObject;
+    '@media (any-pointer: none)'?: ExtendedStyleObject;
+    '@media (update: fast)'?: ExtendedStyleObject;
+    '@media (update: slow)'?: ExtendedStyleObject;
+    '@media (update: none)'?: ExtendedStyleObject;
+    '@media (overflow-block: none)'?: ExtendedStyleObject;
+    '@media (overflow-block: scroll)'?: ExtendedStyleObject;
+    '@media (overflow-block: optional-paged)'?: ExtendedStyleObject;
+    '@media (overflow-block: paged)'?: ExtendedStyleObject;
+    '@media (overflow-inline: none)'?: ExtendedStyleObject;
+    '@media (overflow-inline: scroll)'?: ExtendedStyleObject;
 
     // Container queries
-    '@container (min-width: 0px)'?: CSSProperties;
-    '@container (max-width: 767px)'?: CSSProperties;
-    '@container (min-width: 768px)'?: CSSProperties;
-    '@container (max-width: 1023px)'?: CSSProperties;
-    '@container (min-width: 1024px)'?: CSSProperties;
-    '@container (orientation: portrait)'?: CSSProperties;
-    '@container (orientation: landscape)'?: CSSProperties;
-    '@container style(--custom-property: value)'?: CSSProperties;
+    '@container (min-width: 0px)'?: ExtendedStyleObject;
+    '@container (max-width: 767px)'?: ExtendedStyleObject;
+    '@container (min-width: 768px)'?: ExtendedStyleObject;
+    '@container (max-width: 1023px)'?: ExtendedStyleObject;
+    '@container (min-width: 1024px)'?: ExtendedStyleObject;
+    '@container (orientation: portrait)'?: ExtendedStyleObject;
+    '@container (orientation: landscape)'?: ExtendedStyleObject;
+    '@container style(--custom-property: value)'?: ExtendedStyleObject;
 
     // Support queries
-    '@supports (display: flex)'?: CSSProperties;
-    '@supports (display: grid)'?: CSSProperties;
-    '@supports (display: subgrid)'?: CSSProperties;
-    '@supports (backdrop-filter: blur(10px))'?: CSSProperties;
-    '@supports (mask: url(mask.png))'?: CSSProperties;
-    '@supports (clip-path: circle(50%))'?: CSSProperties;
-    '@supports (container-type: inline-size)'?: CSSProperties;
-    '@supports (view-transition-name: none)'?: CSSProperties;
-    '@supports (anchor-name: --anchor)'?: CSSProperties;
-    '@supports (position-anchor: --anchor)'?: CSSProperties;
-    '@supports selector(:has(> img))'?: CSSProperties;
-    '@supports font-tech(color-COLRv1)'?: CSSProperties;
+    '@supports (display: flex)'?: ExtendedStyleObject;
+    '@supports (display: grid)'?: ExtendedStyleObject;
+    '@supports (display: subgrid)'?: ExtendedStyleObject;
+    '@supports (backdrop-filter: blur(10px))'?: ExtendedStyleObject;
+    '@supports (mask: url(mask.png))'?: ExtendedStyleObject;
+    '@supports (clip-path: circle(50%))'?: ExtendedStyleObject;
+    '@supports (container-type: inline-size)'?: ExtendedStyleObject;
+    '@supports (view-transition-name: none)'?: ExtendedStyleObject;
+    '@supports (anchor-name: --anchor)'?: ExtendedStyleObject;
+    '@supports (position-anchor: --anchor)'?: ExtendedStyleObject;
+    '@supports selector(:has(> img))'?: ExtendedStyleObject;
+    '@supports font-tech(color-COLRv1)'?: ExtendedStyleObject;
 
     // Document and layer rules
-    '@layer base'?: CSSProperties;
-    '@layer components'?: CSSProperties;
-    '@layer utilities'?: CSSProperties;
-    '@scope'?: CSSProperties;
-    '@starting-style'?: CSSProperties;
-    '@page'?: CSSProperties;
-    '@page :first'?: CSSProperties;
-    '@page :left'?: CSSProperties;
-    '@page :right'?: CSSProperties;
-    '@page :blank'?: CSSProperties;
+    '@layer base'?: ExtendedStyleObject;
+    '@layer components'?: ExtendedStyleObject;
+    '@layer utilities'?: ExtendedStyleObject;
+    '@scope'?: ExtendedStyleObject;
+    '@starting-style'?: ExtendedStyleObject;
+    '@page'?: ExtendedStyleObject;
+    '@page :first'?: ExtendedStyleObject;
+    '@page :left'?: ExtendedStyleObject;
+    '@page :right'?: ExtendedStyleObject;
+    '@page :blank'?: ExtendedStyleObject;
 
     // Keyframes
-    '@keyframes'?: Record<string, CSSProperties>;
+    '@keyframes'?: Record<string, ExtendedStyleObject>;
 
     // Child selectors and combinators
-    '& > *'?: CSSProperties;
-    '& + *'?: CSSProperties;
-    '& ~ *'?: CSSProperties;
-    '& *'?: CSSProperties;
-    '&:not()'?: CSSProperties;
-    '&:is()'?: CSSProperties;
-    '&:where()'?: CSSProperties;
-    '&:has()'?: CSSProperties;
+    '& > *'?: ExtendedStyleObject;
+    '& + *'?: ExtendedStyleObject;
+    '& ~ *'?: ExtendedStyleObject;
+    '& *'?: ExtendedStyleObject;
+    '&:not()'?: ExtendedStyleObject;
+    '&:is()'?: ExtendedStyleObject;
+    '&:where()'?: ExtendedStyleObject;
+    '&:has()'?: ExtendedStyleObject;
 
     // Allow any selector pattern
-    [key: `&${string}`]: CSSProperties; // Nested selectors
-    [key: `@${string}`]: CSSProperties; // At-rules
-    [key: `:${string}`]: CSSProperties; // Pseudo-selectors
-    [key: `::${string}`]: CSSProperties; // Pseudo-elements
-    [key: `[${string}]`]: CSSProperties; // Attribute selectors
+    [key: `&${string}`]: ExtendedStyleObject | ReactiveValue<string | number>; // Nested selectors
+    [key: `@${string}`]: ExtendedStyleObject | ReactiveValue<string | number>; // At-rules
+    [key: `:${string}`]: ExtendedStyleObject | ReactiveValue<string | number>; // Pseudo-selectors
+    [key: `::${string}`]: ExtendedStyleObject | ReactiveValue<string | number>; // Pseudo-elements
+    [key: `[${string}]`]: ExtendedStyleObject | ReactiveValue<string | number>; // Attribute selectors
 }
 
 // Main style value type

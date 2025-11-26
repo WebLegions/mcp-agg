@@ -11,7 +11,9 @@ This file provides guidance to Claude Code when working with code in the `src/fr
   - [Docs](https://jurisjs.com/#/docs).
   - Component are reactive to state change. Anti-pattern: calling `render()`!
   - Global state defined in state.ts
+  - Never touch `types/juris/juris.d.ts`. This is not our file. If needed, add to `types/juris/index.d.ts`.
 * CSS is based on [clasless-css](https://github.com/DigitallyTailored/Classless.css), using CSS vars for common styles and theme. 
+  - Use style modifiers when appropriate. Prefer modern sizing like 'rem', 'vh' over 'px' and '%'.
 * Whenever appropriate, replace `div` with a moden HTML tag and use modern attributes to control behaviour. Use JS code to alter functionality only when existing moder attributes are not avail.
   - Each compnent has it's own style embedded in it using [Juris CSSExtractor](node_modules/juris/juris-cssextractor.js) for namespace isolation.
   - Usage of aria-* attributes is mandatory.
@@ -32,5 +34,6 @@ This file provides guidance to Claude Code when working with code in the `src/fr
 
 - Generic components under components folder. Each folder has the main component in the index.ts file and a test file.
 - Register components using with Juris using `app.registerComponent()`.
-- Minimal styles are embedded in the component using the `StyleComponent` type, an `CSSExtractor` wrapper providing automatic scoping with runtime-generated unique class names (`j-icon-a7f3d`), eliminating naming collisions without Shadow DOM complexity.
+- Minimal styles are embedded in the component using the `j.Component` type, an `CSSExtractor` wrapper providing automatic scoping with runtime-generated unique class names (`j-icon-a7f3d`), eliminating naming collisions without Shadow DOM complexity.
+- Styles should add added to the top-most element of the component. 
 - Read [here](https://medium.com/@resti.guay/juris-js-different-faces-of-components-f152a8924d12) to understand global-state, local-state, API-based state and reactive-rendering in a component.

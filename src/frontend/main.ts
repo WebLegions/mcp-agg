@@ -6,139 +6,40 @@
 import { ApiClient } from '../shared/libs/api-client';
 import { Env } from '../shared/utils/env';
 import { ErrorEx } from '../shared/utils/error';
-import { ConfigService } from './services/config-service';
-import { initialState } from './state';
-import type { JurisConfig, JurisContext, ReactiveValue, RouterAPI } from './types/juris';
-import type { JurisVDOMElement as BaseJurisVDOMElement } from './types/juris/juris.d';
+import { ConfigClient } from './services/config-client';
+import { APP_STATE } from './state';
+import type * as JurisTypes from './types/juris';
 import { registerAppShell } from './views/app-shell';
 
-// ============================================================================
-// Application Component Type System
-// ============================================================================
-
-/**
- * App namespace for application-specific component type definitions.
- * This provides better type inference and F12 navigation compared to Juris.RegisteredComponents.
- *
- * Components register their prop types here via declaration merging:
- * ```typescript
- * // In your component file:
- * declare global {
- *     namespace App {
- *         interface Components {
- *             myComponent: MyComponentProps;
- *         }
- *     }
- * }
- * ```
- */
-declare global {
-    namespace App {
-        /**
-         * Application components registry.
-         * Components register their prop types here via declaration merging.
-         */
-        interface Components {}
-    }
-}
-
-/**
- * VDOM Element type that uses App.Components instead of Juris.RegisteredComponents.
- * This provides better type inference for deeply nested component usage.
- *
- * The key difference from JurisVDOMElement:
- * - Uses App.Components namespace (application-specific)
- * - Better type inference in nested structures
- * - F12 navigation works on deeply nested components
- */
-export type AppVDOMElement =
-    | (keyof App.Components extends never
-          ? never
-          : {
-                [K in keyof App.Components]: {
-                    [P in K]: App.Components[K] & {
-                        children?: ReactiveValue<AppVDOMElement[]>;
-                        key?: string | number;
-                    };
-                };
-            }[keyof App.Components])
-    | BaseJurisVDOMElement;
-
-// ============================================================================
-// Application Context Type
-// ============================================================================
-
-export type AppState = typeof initialState;
-/**
- * This is the flow from headless service to context:
- * 1. main.ts registers headless (Router) or service (ApiClient).
- * 2. HeadlessManager initializes Router and gets the api object.
- * 3. HeadlessManager assigns juris.headlessAPIs.router = api.
- * 4. Juris creates the context for a component: ctx = { ...state, ...headlessAPIs, ...services }.
- * 5. The component receives ctx.router or ctx.apiClient.
- */
-
-export interface AppContext extends JurisContext<AppState> {
+// Application context with our services
+interface AppContext extends Omit<JurisTypes.JurisContext<typeof APP_STATE>, 'getState'> {
     api: ApiClient;
-    router: RouterAPI;
-    config: ConfigService;
+    router: JurisTypes.RouterAPI;
+    config: ConfigClient;
 
-    // clean some Juris types to make code consistant
+    // better typing for getState
+    getState: {
+        (path: string, defaultValue: string, track?: boolean): string;
+        (path: string, defaultValue: number, track?: boolean): number;
+        (path: string, defaultValue: boolean, track?: boolean): boolean;
+        (path: string, defaultValue: bigint, track?: boolean): bigint;
+        <T>(path: string, defaultValue?: T, track?: boolean): T;
+    };
+
+    juris: AppClass;
+
+    // using these from context is an anti-pattern. use getXx instead.
     services: never;
     headless: never;
     headlessAPIs: never;
 }
 
-/**
- * Component function type for this application
- *
- * Uses AppVDOMElement as return type for better type inference on nested components.
- * AppVDOMElement uses App.Components namespace instead of Juris.RegisteredComponents.
- */
-export type AppComponent<P = Record<string, unknown>> = (
-    props: P,
-    context: AppContext,
-) => AppVDOMElement | { render: () => AppVDOMElement };
+export class AppClass extends Juris<typeof APP_STATE> {
+    // Hide getState and setState from public API - use context.getState/setState instead
+    declare getState: never;
+    declare setState: never;
 
-/**
- * Type assertion helper for AppVDOMElement.
- * Note: This doesn't improve hover/F12 for nested components due to TypeScript limitations.
- *
- * Example:
- * ```typescript
- * const myComp = vdom({
- *     div: {
- *         p: 'hello'
- *     }
- * });
- * ```
- */
-export const vdom = <T extends AppVDOMElement>(element: T): AppVDOMElement => element;
-
-/**
- * Type-safe component creator helper.
- * Provides better F12 navigation and hover types for registered components.
- *
- * Use this to create component elements with full type inference:
- * ```typescript
- * children: [
- *     v('icon', {
- *         image: myIcon,
- *         ariaLabel: 'test',  // ← F12 and hover work!
- *     }),
- *     v('themeSwitch', {})
- * ]
- * ```
- */
-export const v = <K extends keyof App.Components>(name: K, props: App.Components[K]): AppVDOMElement =>
-    ({ [name]: props }) as AppVDOMElement;
-
-// ============================================================================
-// Main Application Class
-// ============================================================================
-
-export class App extends Juris {
-    constructor() {
+    constructor(mountTag: string) {
         Env.print();
         const isDev = Env.get('NODE_ENV', 'production') === 'development';
 
@@ -171,16 +72,16 @@ export class App extends Juris {
                 cssExtractor: CSSExtractor,
                 headless: HeadlessManager,
             },
-            logLevel: Env.get('C_LOG_LEVEL', isDev ? 'info' : 'error') as JurisConfig['logLevel'],
-            states: initialState,
+            logLevel: Env.get('C_LOG_LEVEL', isDev ? 'info' : 'error'),
+            states: APP_STATE,
             // services with no context
             services: {
                 api: new ApiClient(apiBase),
             },
         });
 
-        // NB! For unknown reason the HeadlessManager is not initilized durign ctor.
-        // We need to initilaize it here, then register the headless components,
+        // NB! For unknown reason the HeadlessManager is not initialized during ctor.
+        // We need to initialize it here, then register the headless components,
         // then we can set a layout and render it manually.
         const headlessManager: typeof HeadlessManager = Object(this).headlessManager;
         if (headlessManager && typeof headlessManager.register === 'function') {
@@ -188,31 +89,62 @@ export class App extends Juris {
 
             headlessManager.register('router', Router, { autoInit: true, mode: 'history' });
 
-            headlessManager.register('config', ConfigService.headless, { autoInit: true });
+            headlessManager.register('config', ConfigClient.headless, { autoInit: true });
             headlessManager.initializeQueued();
 
             console.log(`Router API: ${Object.keys(headlessManager.getAPI('router') ?? {}).length} functions.`);
             console.log(`Config API: ${Object.keys(headlessManager.getAPI('config') ?? {}).length} functions.`);
         } else {
-            console.error('Cannot register headless components - register method not available');
+            console.error('HeadlessManager: register method not available');
         }
 
         registerAppShell(this);
         Object(this).layout = { appShell: {} };
-        this.render('#app');
+        this.render(mountTag);
     }
 }
 
-// Extend Window interface to include our app instance
-declare global {
-    interface Window {
-        mcpApp: App;
+// Unified namespace for all application exports
+export namespace j {
+    export type Component<P = Record<string, unknown>> = (
+        props: P,
+        ctx: j.Context,
+    ) => JurisTypes.JurisVDOMElement | { render: () => JurisTypes.JurisVDOMElement };
+    export type Style = JurisTypes.StyleValue;
+    export type Elem = JurisTypes.JurisVDOMElement;
+    export type ReactiveValue<T> = JurisTypes.ReactiveValue<T>;
+
+    export type State = typeof APP_STATE;
+    export type Context = AppContext;
+    export type App = AppClass;
+
+    // Re-export all Juris types under j.juris namespace
+    export namespace juris {
+        export type ArmedInstance = JurisTypes.ArmedInstance;
+        export type CSSExtractor = JurisTypes.CSSExtractor;
+        export type ExtendedStyleObject = JurisTypes.ExtendedStyleObject;
+        export type HeadlessComponent<T = unknown> = JurisTypes.HeadlessComponent<T>;
+        export type HeadlessComponentFunction<T = unknown> = JurisTypes.HeadlessComponentFunction<T>;
+        export type HeadlessManager = JurisTypes.HeadlessManager;
+        export type JurisConstructor = JurisTypes.JurisConstructor;
+        export type JurisContext<TState = Record<string, unknown>> = JurisTypes.JurisContext<TState>;
+        export type JurisInputElement = JurisTypes.JurisInputElement;
+        export type JurisInstance<TState = Record<string, unknown>> = JurisTypes.JurisInstance<TState>;
+        export type JurisVDOMElement = JurisTypes.JurisVDOMElement;
+        export type ParsedURL = JurisTypes.ParsedURL;
+        export type ReactiveValue<T> = JurisTypes.ReactiveValue<T>;
+        export type RouteConfig = JurisTypes.RouteConfig;
+        export type RouteGuard = JurisTypes.RouteGuard;
+        export type RouteMatch = JurisTypes.RouteMatch;
+        export type RouterAPI = JurisTypes.RouterAPI;
+        export type RouterConfig = JurisTypes.RouterConfig;
+        export type SVGProperties = JurisTypes.SVGProperties;
     }
 }
 
 // Initialize the app when the page loads
 if (typeof window !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
-        window.mcpApp = new App();
+        new AppClass('#app');
     });
 }

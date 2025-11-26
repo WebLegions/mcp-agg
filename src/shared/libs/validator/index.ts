@@ -82,7 +82,7 @@ export namespace z {
     // biome-ignore lint/suspicious/noExplicitAny: Zod compatibility - generic object type
     export type ZodObject = ObjV<any>;
     export type ZodString = StrV;
-    // biome-ignore lint/style/useNamingConvention: Zod compatibility
+    // biome-ignore lint/style/useNamingConvention: Zod compatibility - infer must be lowercase
     export type infer<T> = Infer<T>;
 
     // SafeParse result types

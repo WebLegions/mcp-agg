@@ -21,7 +21,7 @@ describe.skip('SSESession', () => {
             signal: new AbortController().signal,
             nextDelay: () => 1,
             failed: false,
-            abort: () => { },
+            abort: () => {},
             state: { failures: 0 },
         };
 
@@ -44,7 +44,7 @@ describe.skip('SSESession', () => {
             signal: new AbortController().signal,
             nextDelay: () => 1,
             failed: false,
-            abort: () => { },
+            abort: () => {},
             state: { failures: 0 },
         };
 
@@ -82,7 +82,7 @@ describe.skip('SSESession', () => {
             signal: new AbortController().signal,
             nextDelay: () => 1,
             failed: false,
-            abort: () => { },
+            abort: () => {},
             state: { failures: 0 },
         };
 
@@ -124,8 +124,8 @@ describe.skip('SSESession', () => {
     test('should handle multiple SSE events', async () => {
         const text = new TextEncoder().encode(
             'event:endpoint\ndata:/messages?sessionId=xyz\n\n' +
-            'event:message\ndata:{"msg":"first"}\n\n' +
-            'event:message\ndata:{"msg":"second"}\n\n',
+                'event:message\ndata:{"msg":"first"}\n\n' +
+                'event:message\ndata:{"msg":"second"}\n\n',
         );
         const mockStream = new ReadableStream<Uint8Array>({
             start(controller) {
@@ -138,7 +138,7 @@ describe.skip('SSESession', () => {
             signal: new AbortController().signal,
             nextDelay: () => 1,
             failed: false,
-            abort: () => { },
+            abort: () => {},
             state: { failures: 0 },
         };
 
@@ -168,7 +168,7 @@ describe.skip('SSESession', () => {
             signal: new AbortController().signal,
             nextDelay: () => 1,
             failed: false,
-            abort: () => { },
+            abort: () => {},
             state: { failures: 0 },
         };
 
@@ -198,7 +198,7 @@ describe.skip('SSESession', () => {
             signal: new AbortController().signal,
             nextDelay: () => 1,
             failed: false,
-            abort: () => { },
+            abort: () => {},
             state: { failures: 0 },
         };
 
@@ -230,7 +230,7 @@ describe.skip('SSESession', () => {
             signal: new AbortController().signal,
             nextDelay: () => 1,
             failed: false,
-            abort: () => { },
+            abort: () => {},
             state: { failures: 0 },
         };
 
@@ -347,7 +347,7 @@ describe.skip('SSESession', () => {
             signal: new AbortController().signal,
             nextDelay: () => 1,
             failed: false,
-            abort: () => { },
+            abort: () => {},
             state: { failures: 0 },
         };
 
@@ -376,7 +376,7 @@ describe.skip('SSESession', () => {
                 signal: new AbortController().signal,
                 nextDelay: () => 1,
                 failed: false,
-                abort: () => { },
+                abort: () => {},
                 state: { failures: 0 },
             };
 
@@ -409,7 +409,7 @@ describe.skip('SSESession', () => {
             signal: new AbortController().signal,
             nextDelay: () => 1,
             failed: false,
-            abort: () => { },
+            abort: () => {},
             state: { failures: 0 },
         };
 
@@ -433,7 +433,7 @@ describe.skip('SSESession', () => {
             signal: new AbortController().signal,
             nextDelay: () => 1,
             failed: false,
-            abort: () => { },
+            abort: () => {},
             state: { failures: 0 },
         };
 

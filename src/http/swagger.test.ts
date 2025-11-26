@@ -4,7 +4,7 @@ import { createServer, registerRoutes } from './server';
 
 describe('Swagger documentation', () => {
     test('GET /api/v1/openapi.json returns OpenAPI spec', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -24,7 +24,7 @@ describe('Swagger documentation', () => {
     });
 
     test('GET /api/v1/openapi.json includes registered paths', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -41,7 +41,7 @@ describe('Swagger documentation', () => {
     });
 
     test('GET /api/v1/swagger returns Scalar API Reference HTML', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -55,7 +55,7 @@ describe('Swagger documentation', () => {
     });
 
     test('OpenAPI spec has correct structure', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -77,7 +77,7 @@ describe('Swagger documentation', () => {
     });
 
     test('OpenAPI spec includes application routes', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({

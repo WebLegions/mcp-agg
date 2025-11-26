@@ -7,7 +7,7 @@ describe('Error Handler', () => {
     let app: FastifyInstance;
 
     beforeEach(async () => {
-        app = createServer();
+        app = await createServer();
         await registerRoutes(app);
     });
 

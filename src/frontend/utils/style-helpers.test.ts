@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import type { j } from '../main';
 import { mergeStyles } from './style-helpers';
 
 describe('Style Helpers', () => {
@@ -52,10 +53,10 @@ describe('Style Helpers', () => {
                 ':hover': {
                     color: 'blue',
                 },
-            };
+            } as j.Style;
             const style2 = {
                 fontSize: '14px',
-            };
+            } as j.Style;
 
             const result = mergeStyles(style1, style2);
 

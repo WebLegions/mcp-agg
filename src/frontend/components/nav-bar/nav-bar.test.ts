@@ -3,12 +3,11 @@ import { strict as assert } from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, beforeEach, describe, test } from 'node:test';
-import type { AppContext } from '../../main';
-import type { JurisInstance, JurisVDOMElement } from '../../types/juris';
+import type { j } from '../../main';
 import { type NavRoute, navBar } from './index';
 
 describe('NavBar Component (DOM Rendering)', () => {
-    let juris: JurisInstance;
+    let juris: j.juris.JurisInstance;
 
     // One-time setup: Create DOM and load Juris
     before(() => {
@@ -30,10 +29,10 @@ describe('NavBar Component (DOM Rendering)', () => {
         });
 
         // Create a wrapper component that provides router context
-        const navBarWrapper = (props: { routes: NavRoute[] }, ctx: AppContext) => {
-            // Mock router in context
+        const navBarWrapper = (props: { routes: NavRoute[] }, ctx: j.Context) => {
+            // Mock router in context - matching real router API
             const mockRouter = {
-                getState: () => 'url.path',
+                getCurrentPath: () => ctx.getState('url.path', '/'),
                 navigate: (path: string) => {
                     ctx.setState('url.path', path);
                 },
@@ -43,7 +42,7 @@ describe('NavBar Component (DOM Rendering)', () => {
             const contextWithRouter = {
                 ...ctx,
                 router: mockRouter,
-            } as AppContext;
+            } as j.Context;
 
             // Call original navBar with mocked context
             return navBar(props, contextWithRouter);
@@ -65,7 +64,7 @@ describe('NavBar Component (DOM Rendering)', () => {
             { path: '/contact', label: 'Contact' },
         ];
 
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {
@@ -107,7 +106,7 @@ describe('NavBar Component (DOM Rendering)', () => {
             { path: '/about', label: 'About' },
         ];
 
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {
@@ -138,7 +137,7 @@ describe('NavBar Component (DOM Rendering)', () => {
     });
 
     test('should handle empty routes array', () => {
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {

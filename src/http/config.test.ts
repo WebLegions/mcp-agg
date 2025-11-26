@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, test } from 'node:test';
-import { getManager } from '../controllers/mcp-controller/config';
+import { getManager } from '../controllers/mcp-controller/config-file';
 import { createServer, registerRoutes } from './server';
 
 describe('MCP Configuration REST API', () => {
@@ -10,27 +10,35 @@ describe('MCP Configuration REST API', () => {
         // Get the global manager (singleton) - routes use the same instance
         manager = getManager(undefined, false);
         // Clean up any existing servers from previous tests (except builtin)
-        const servers = await manager.getAllServers();
+        const servers = await manager.find();
         for (const server of servers) {
             if (server.name !== 'builtin') {
-                await manager.removeServer(server.name);
+                try {
+                    await manager.delete(server.name);
+                } catch {
+                    // Ignore errors during cleanup
+                }
             }
         }
     });
 
     afterEach(async () => {
         // Clean up all servers after each test (except builtin)
-        const servers = await manager.getAllServers();
+        const servers = await manager.find();
         for (const server of servers) {
             if (server.name !== 'builtin') {
-                await manager.removeServer(server.name);
+                try {
+                    await manager.delete(server.name);
+                } catch {
+                    // Ignore errors during cleanup
+                }
             }
         }
         manager.cleanup();
     });
 
     test('GET /api/v1/config lists all servers', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         // Empty config should have builtin server by default
@@ -46,7 +54,7 @@ describe('MCP Configuration REST API', () => {
         assert.ok(initialBody.servers.some((s: { name: string }) => s.name === 'builtin'));
 
         // Add a test server - builtin should remain
-        await manager.upsertServer({
+        await manager.create({
             name: 'test-server',
             transport: 'stdio',
             command: 'node',
@@ -69,7 +77,7 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('Builtin server persists through add/remove operations', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         // Start with empty config - should have builtin
@@ -82,7 +90,7 @@ describe('MCP Configuration REST API', () => {
         assert.ok(initialBody.servers.some((s: { name: string }) => s.name === 'builtin'));
 
         // Add a server - builtin stays
-        await manager.upsertServer({
+        await manager.create({
             name: 'test-server',
             transport: 'stdio',
             command: 'node',
@@ -117,10 +125,10 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('GET /api/v1/config/:name returns specific server', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
-        await manager.upsertServer({
+        await manager.create({
             name: 'test-server',
             transport: 'stdio',
             command: 'node',
@@ -141,7 +149,7 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('GET /api/v1/config/:name returns 404 for non-existent server', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -155,7 +163,7 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('POST /api/v1/config creates new stdio server', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -175,13 +183,13 @@ describe('MCP Configuration REST API', () => {
         assert.equal(body.name, 'new-server');
 
         // Verify it was actually created
-        const server = await manager.getServer('new-server');
+        const server = await manager.find('new-server');
         assert.ok(server);
         assert.equal(server.transport, 'stdio');
     });
 
     test('POST /api/v1/config creates new SSE server', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -199,13 +207,13 @@ describe('MCP Configuration REST API', () => {
         const body = JSON.parse(response.body);
         assert.equal(body.name, 'sse-server');
 
-        const server = await manager.getServer('sse-server');
+        const server = await manager.find('sse-server');
         assert.ok(server);
         assert.equal(server.transport, 'sse');
     });
 
     test('POST /api/v1/config rejects invalid transport', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -222,11 +230,11 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('POST /api/v1/config rejects duplicate server name', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         // Create first server
-        await manager.upsertServer({
+        await manager.create({
             name: 'duplicate',
             transport: 'stdio',
             command: 'node',
@@ -248,10 +256,10 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('PUT /api/v1/config/:name updates existing server', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
-        await manager.upsertServer({
+        await manager.create({
             name: 'update-me',
             transport: 'stdio',
             command: 'node',
@@ -269,7 +277,7 @@ describe('MCP Configuration REST API', () => {
         });
 
         assert.equal(response.statusCode, 200);
-        const server = await manager.getServer('update-me');
+        const server = await manager.find('update-me');
         assert.ok(server);
         if (server.transport === 'stdio') {
             assert.equal(server.command, 'bun');
@@ -278,7 +286,7 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('PUT /api/v1/config/:name returns 404 for non-existent server', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -293,10 +301,10 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('DELETE /api/v1/config/:name removes server', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
-        await manager.upsertServer({
+        await manager.create({
             name: 'delete-me',
             transport: 'stdio',
             command: 'node',
@@ -311,12 +319,12 @@ describe('MCP Configuration REST API', () => {
         assert.equal(response.statusCode, 200);
 
         // Verify it was deleted
-        const server = await manager.getServer('delete-me');
+        const server = await manager.find('delete-me');
         assert.equal(server, undefined);
     });
 
     test('DELETE /api/v1/config/:name returns 404 for non-existent server', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -328,10 +336,10 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('PATCH /api/v1/config/:name/enabled toggles server status', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
-        await manager.upsertServer({
+        await manager.create({
             name: 'toggle-me',
             transport: 'stdio',
             command: 'node',
@@ -348,7 +356,7 @@ describe('MCP Configuration REST API', () => {
         });
 
         assert.equal(response1.statusCode, 200);
-        let server = await manager.getServer('toggle-me');
+        let server = await manager.find('toggle-me');
         assert.equal(server?.enabled, false);
 
         // Enable it again
@@ -361,12 +369,12 @@ describe('MCP Configuration REST API', () => {
         });
 
         assert.equal(response2.statusCode, 200);
-        server = await manager.getServer('toggle-me');
+        server = await manager.find('toggle-me');
         assert.equal(server?.enabled, true);
     });
 
     test('GET /api/v1/config/tools lists all available tools', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -404,7 +412,7 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('GET /api/v1/config/tools filters by server name', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         // Filter for builtin tools only
@@ -428,7 +436,7 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('GET /api/v1/config/tools returns 404 for non-existent server filter', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         const response = await app.inject({
@@ -443,7 +451,7 @@ describe('MCP Configuration REST API', () => {
     });
 
     test('GET /api/v1/config/tools respects server enabled status', async () => {
-        const app = createServer();
+        const app = await createServer();
         await registerRoutes(app);
 
         // Verify that registerMCPServerTools uses getEnabled() which filters disabled servers

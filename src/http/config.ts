@@ -4,7 +4,7 @@
  */
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { getManager } from '../controllers/mcp-controller/config';
+import { getManager } from '../controllers/mcp-controller/config-file';
 import { registerMCPServerTools } from '../controllers/mcp-controller/register';
 import { MCPServer } from '../libs/mcp-server';
 import { z } from '../shared/libs/validator';
@@ -27,7 +27,8 @@ const errorResponse = z.object({
     error: z.string(),
 });
 
-const enabledResponse = z
+// Deprecated: Keeping for backwards compatibility but no longer used
+const _enabledResponse = z
     .object({
         name: z.string(),
         enabled: z.boolean(),
@@ -94,7 +95,7 @@ const createServerSchema: RouteSchema = {
     summary: 'Create MCP server',
     body: mcpServerConfigSchema,
     response: {
-        201: successResponse,
+        201: mcpServerConfigSchema.describe('Created server configuration'),
         400: errorResponse.describe('Invalid server configuration'),
         409: errorResponse.describe('Server already exists'),
     },
@@ -117,7 +118,7 @@ const updateServerSchema: RouteSchema = {
         description: z.string().optional(),
     }),
     response: {
-        200: successResponse,
+        200: mcpServerConfigSchema.describe('Updated server configuration'),
         404: errorResponse.describe('Server not found'),
         400: errorResponse.describe('Invalid server configuration'),
     },
@@ -147,7 +148,7 @@ const enableServerSchema: RouteSchema = {
         enabled: z.boolean(),
     }),
     response: {
-        200: enabledResponse,
+        200: mcpServerConfigSchema.describe('Updated server configuration'),
         404: errorResponse.describe('Server not found'),
     },
 };
@@ -173,7 +174,7 @@ export function registerConfig(app: FastifyInstance): void {
 
     // GET /api/v1/config - List all servers
     app.get('/api/v1/config', { schema: listServersSchema }, async (_request: FastifyRequest, reply: FastifyReply) => {
-        const servers = await manager.getAllServers();
+        const servers = await manager.find();
         return reply.code(200).send({
             servers,
             total: servers.length,
@@ -185,7 +186,7 @@ export function registerConfig(app: FastifyInstance): void {
         '/api/v1/config/:name',
         { schema: getServerSchema },
         async (request: FastifyRequest<WithParams<{ name: string }>>, reply: FastifyReply) => {
-            const server = await manager.getServer(request.params.name);
+            const server = await manager.find(request.params.name);
             if (!server) {
                 return reply.code(404).send({ error: `Server '${request.params.name}' not found` });
             }
@@ -202,19 +203,17 @@ export function registerConfig(app: FastifyInstance): void {
             // Validate request body
             const config = mcpServerConfigSchema.parse(request.body);
 
-            // Check if server already exists
-            const existing = await manager.getServer(config.name);
-            if (existing) {
-                return reply.code(409).send({ error: `Server '${config.name}' already exists` });
+            try {
+                // Create server (throws if already exists)
+                const created = await manager.create(config);
+                return reply.code(201).send(created);
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : String(error);
+                if (msg.includes('already exists')) {
+                    return reply.code(409).send({ error: msg });
+                }
+                throw error;
             }
-
-            // Add server
-            await manager.upsertServer(config);
-
-            return reply.code(201).send({
-                name: config.name,
-                message: 'Server created successfully',
-            });
         },
     );
 
@@ -223,25 +222,23 @@ export function registerConfig(app: FastifyInstance): void {
         '/api/v1/config/:name',
         { schema: updateServerSchema },
         async (request: FastifyRequest<WithParamsAndBody<{ name: string }, Partial<MCPServerConfig>>>, reply: FastifyReply) => {
-            // Check if server exists
-            const existing = await manager.getServer(request.params.name);
-            if (!existing) {
-                return reply.code(404).send({ error: `Server '${request.params.name}' not found` });
-            }
-
-            // Merge with existing config
-            const updated = { ...existing, ...request.body, name: request.params.name };
+            // Merge with name from URL (ensures name stays consistent)
+            const updates = { ...request.body, name: request.params.name };
 
             // Validate merged config
-            const validConfig = mcpServerConfigSchema.parse(updated);
+            const validConfig = mcpServerConfigSchema.parse(updates);
 
-            // Upsert server config
-            await manager.upsertServer(validConfig);
-
-            return reply.code(200).send({
-                name: request.params.name,
-                message: 'Server updated successfully',
-            });
+            try {
+                // Update server (throws if not found)
+                const updated = await manager.update(request.params.name, validConfig);
+                return reply.code(200).send(updated);
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : String(error);
+                if (msg.includes('not found')) {
+                    return reply.code(404).send({ error: msg });
+                }
+                throw error;
+            }
         },
     );
 
@@ -250,25 +247,17 @@ export function registerConfig(app: FastifyInstance): void {
         '/api/v1/config/:name',
         { schema: updateServerSchema },
         async (request: FastifyRequest<WithParamsAndBody<{ name: string }, Partial<MCPServerConfig>>>, reply: FastifyReply) => {
-            // Check if server exists
-            const existing = await manager.getServer(request.params.name);
-            if (!existing) {
-                return reply.code(404).send({ error: `Server '${request.params.name}' not found` });
+            try {
+                // Update server with partial updates (manager handles validation)
+                const updated = await manager.update(request.params.name, request.body);
+                return reply.code(200).send(updated);
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : String(error);
+                if (msg.includes('not found')) {
+                    return reply.code(404).send({ error: msg });
+                }
+                throw error;
             }
-
-            // Merge with existing config
-            const updated = { ...existing, ...request.body, name: request.params.name };
-
-            // Validate merged config
-            const validConfig = mcpServerConfigSchema.parse(updated);
-
-            // Upsert server config
-            await manager.upsertServer(validConfig);
-
-            return reply.code(200).send({
-                name: request.params.name,
-                message: 'Server updated successfully',
-            });
         },
     );
 
@@ -277,15 +266,19 @@ export function registerConfig(app: FastifyInstance): void {
         '/api/v1/config/:name',
         { schema: deleteServerSchema },
         async (request: FastifyRequest<WithParams<{ name: string }>>, reply: FastifyReply) => {
-            const removed = await manager.removeServer(request.params.name);
-            if (!removed) {
-                return reply.code(404).send({ error: `Server '${request.params.name}' not found` });
+            try {
+                await manager.delete(request.params.name);
+                return reply.code(200).send({
+                    name: request.params.name,
+                    message: 'Server deleted successfully',
+                });
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : String(error);
+                if (msg.includes('not found')) {
+                    return reply.code(404).send({ error: msg });
+                }
+                throw error;
             }
-
-            return reply.code(200).send({
-                name: request.params.name,
-                message: 'Server deleted successfully',
-            });
         },
     );
 
@@ -294,20 +287,17 @@ export function registerConfig(app: FastifyInstance): void {
         '/api/v1/config/:name/enabled',
         { schema: enableServerSchema },
         async (request: FastifyRequest<WithParamsAndBody<{ name: string }, { enabled: boolean }>>, reply: FastifyReply) => {
-            // Check if server exists
-            const existing = await manager.getServer(request.params.name);
-            if (!existing) {
-                return reply.code(404).send({ error: `Server '${request.params.name}' not found` });
+            try {
+                // Update enabled status and return updated server
+                const updated = await manager.update(request.params.name, { enabled: request.body.enabled });
+                return reply.code(200).send(updated);
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : String(error);
+                if (msg.includes('not found')) {
+                    return reply.code(404).send({ error: msg });
+                }
+                throw error;
             }
-
-            // Update enabled status
-            await manager.enable(request.params.name, request.body.enabled);
-
-            return reply.code(200).send({
-                name: request.params.name,
-                enabled: request.body.enabled,
-                message: `Server ${request.body.enabled ? 'enabled' : 'disabled'} successfully`,
-            });
         },
     );
 
@@ -320,7 +310,7 @@ export function registerConfig(app: FastifyInstance): void {
 
             // If filtering by server, check if it exists (except for "builtin")
             if (serverFilter && serverFilter !== 'builtin') {
-                const serverConfig = await manager.getServer(serverFilter);
+                const serverConfig = await manager.find(serverFilter);
                 if (!serverConfig) {
                     return reply.code(404).send({ error: `Server '${serverFilter}' not found` });
                 }

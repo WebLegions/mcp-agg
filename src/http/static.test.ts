@@ -14,7 +14,7 @@ describe('Static file serving', () => {
         process.env.PORT = String(testPort);
         process.env.HOST = '127.0.0.1';
 
-        server = createServer();
+        server = await createServer();
         await registerRoutes(server);
         serverPromise = startServer(server);
         await sleep(100); // Give server time to start

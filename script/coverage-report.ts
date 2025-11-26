@@ -5,6 +5,7 @@
  * - Adds zero-coverage entries for files not in lcov report.
  * - Removes files with * istanbul ignore file * comments from coverage.
  * - Removes lines with * istanbul ignore next * comments from coverage calculations.
+ * - Removes lines with * istanbul ignore start/stop * comments from coverage calculations.
  * - Generates a report showing coverage per file and folder.
  */
 
@@ -30,9 +31,6 @@ const TEST_COVERAGE_IGNORE = Env.get('TEST_COVERAGE_IGNORE', [
     '**/__mocks__/**',
     'script/**',
     '**/*cluster*.ts',
-    'src/frontend/**',
-    'src/http/inject-env-posthook.ts',
-    'src/utils/env.ts',
 ]);
 
 interface FileCoverage {
@@ -45,7 +43,9 @@ interface FileCoverage {
     branchesCov: number;
     funcsCov: number;
     uncovered: number[];
-    ignored: boolean; // Has Istanbul ignore comment
+    ignored: boolean; // Has Istanbul ignore comment for entire file
+    ignoredFuncs: Set<number>; // Line numbers of ignored function declarations
+    hasIgnoredLines: boolean; // Has some (not all) lines ignored
 }
 
 interface FolderCoverage {
@@ -83,22 +83,28 @@ function parseLcov(lcovData: string): FileCoverage[] {
         branchesCov: 0,
         funcsCov: 0,
         ignored: false,
+        ignoredFuncs: new Set(),
+        hasIgnoredLines: false,
     } as const;
     let file = empty;
     let ignoredLines: Set<number> = new Set();
+    let ignoredFuncs: Set<number> = new Set();
 
     for (const line of lines) {
         if (line.startsWith('SF:')) {
             // Start of new file
-            file = { ...empty, uncovered: [] }; // Create new array for each file
+            file = { ...empty, uncovered: [], ignoredFuncs: new Set(), hasIgnoredLines: false }; // Create new array and set for each file
             file.path = normalizePath(line.substring(3));
             file.name = path.basename(file.path);
 
             // Load istanbul ignore comments for this file
             const absolutePath = join(cwd, file.path);
-            ignoredLines = getIstanbulIgnoredLines(absolutePath);
-            // Set ignored property for this file
+            [ignoredLines, ignoredFuncs] = getIstanbulIgnored(absolutePath);
+            file.ignoredFuncs = ignoredFuncs;
+            // Set ignored property for this file (entire file ignored)
             file.ignored = ignoredLines.has(-1);
+            // Set hasIgnoredLines if there are some (but not all) lines ignored
+            file.hasIgnoredLines = !file.ignored && ignoredLines.size > 0;
         } else if (line.startsWith('DA:')) {
             // Data about a line: DA:line,hitCount
             const parts = line.substring(3).split(',');
@@ -123,12 +129,12 @@ function parseLcov(lcovData: string): FileCoverage[] {
             // Lines hit - IGNORE buggy LH value, use DA hit count instead
             // file.linesCov = Number.parseInt(line.substring(3), 10);
         } else if (line.startsWith('FNF:')) {
-            // Functions found - skip if file is ignored
+            // Functions found - use lcov value, will handle ignored functions in display
             if (!file.ignored) {
                 file.funcs = Number.parseInt(line.substring(4), 10);
             }
         } else if (line.startsWith('FNH:')) {
-            // Functions hit - skip if file is ignored
+            // Functions hit - use lcov value directly
             if (!file.ignored) {
                 file.funcsCov = Number.parseInt(line.substring(4), 10);
             }
@@ -206,12 +212,14 @@ function findBlockEnd(lines: string[], startIdx: number): number {
 }
 
 /**
- * Parse istanbul ignore comments and return Set of line numbers to ignore
+ * Parse istanbul ignore comments and return ignored lines and function declarations
  * Supports istanbul ignore next (ignores next statement/block)
  * and istanbul ignore start/stop (ignores range)
+ * Returns tuple: [ignoredLines, ignoredFunction]
  */
-function getIstanbulIgnoredLines(filePath: string): Set<number> {
+function getIstanbulIgnored(filePath: string): [Set<number>, Set<number>] {
     const ignoredLines = new Set<number>();
+    const ignoredFuncs = new Set<number>();
 
     try {
         const content = readFileSync(filePath, 'utf-8');
@@ -222,8 +230,12 @@ function getIstanbulIgnoredLines(filePath: string): Set<number> {
         const firstLines = lines.slice(0, 10).join('\n');
         if (/\/\*\s*(istanbul|c8)\s+ignore\s+file\b/.test(firstLines)) {
             ignoredLines.add(-1);
-            return ignoredLines;
+            return [ignoredLines, ignoredFuncs];
         }
+
+        // Function pattern to detect function declarations and arrow functions
+        // Matches: function foo(), const/let/var x = () =>, x = () =>, () =>, callbacks, etc.
+        const funcPattern = /(?:function\s+\w+|\w+\s*=\s*(?:async\s*)?\(.*\)\s*=>|\(\s*.*?\s*\)\s*=>|=>\s*\{)/;
 
         // search for other ignore comments
         let inIgnoreBlock = false;
@@ -247,6 +259,10 @@ function getIstanbulIgnoredLines(filePath: string): Set<number> {
             // If in ignore block, mark this line
             if (inIgnoreBlock) {
                 ignoredLines.add(lineNum);
+                // Check if this line has a function declaration
+                if (funcPattern.test(line)) {
+                    ignoredFuncs.add(lineNum);
+                }
                 continue;
             }
 
@@ -265,19 +281,27 @@ function getIstanbulIgnoredLines(filePath: string): Set<number> {
                         // Mark entire block (from next line to closing brace, inclusive)
                         for (let j = nextLineNum; j <= blockEnd + 1; j++) {
                             ignoredLines.add(j);
+                            // Check if this line has a function declaration
+                            if (funcPattern.test(lines[j - 1])) {
+                                ignoredFuncs.add(j);
+                            }
                         }
                     } else {
                         // Just mark the next line
                         ignoredLines.add(nextLineNum);
+                        // Check if this line has a function declaration
+                        if (funcPattern.test(lines[nextLineIdx])) {
+                            ignoredFuncs.add(nextLineNum);
+                        }
                     }
                 }
             }
         }
     } catch {
-        // If file can't be read, return empty set
+        // If file can't be read, return empty sets
     }
 
-    return ignoredLines;
+    return [ignoredLines, ignoredFuncs];
 }
 
 /**
@@ -299,7 +323,8 @@ function addMissingFilesToCoverage(coverageFiles: FileCoverage[]): FileCoverage[
         const normalizedPath = join(cwd, normalizePath(file));
         if (coveredFiles.has(normalizedPath)) continue;
 
-        const ignoredLines = getIstanbulIgnoredLines(normalizedPath);
+        const [ignoredLines, ignoredFuncs] = getIstanbulIgnored(normalizedPath);
+        const isFullyIgnored = ignoredLines.has(-1);
         // add the missing file. and mark if it should be ignored.
         missingFiles.push({
             name: path.basename(file),
@@ -311,7 +336,9 @@ function addMissingFilesToCoverage(coverageFiles: FileCoverage[]): FileCoverage[
             branches: 0,
             branchesCov: 0,
             uncovered: [1],
-            ignored: ignoredLines.has(-1),
+            ignored: isFullyIgnored,
+            ignoredFuncs: ignoredFuncs,
+            hasIgnoredLines: !isFullyIgnored && ignoredLines.size > 0,
         });
     }
     if (missingFiles.length > 0) {
@@ -444,11 +471,11 @@ try {
 
     // Add "All files" summary first
     const allFilesLines = Math.round((coveredLines / totalLines) * 100);
-    const allFilesFuncs = Math.round((coveredFunctions / totalFunctions) * 100);
+    const allFilesFuncs = totalFunctions > 0 ? Math.round((coveredFunctions / totalFunctions) * 100) : 100;
     tableData.push({
         name: indentPad('All files'),
         lines: formatPercent(allFilesLines, allFilesLines < TEST_LINE_THRESH),
-        funcs: formatPercent(allFilesFuncs, allFilesFuncs < TEST_FUNC_THRESH),
+        funcs: totalFunctions > 0 ? formatPercent(allFilesFuncs, allFilesFuncs < TEST_FUNC_THRESH) : '-'.padStart(7),
         uncov: formatUncovered([]),
     });
 
@@ -485,24 +512,28 @@ try {
 
         // Add files in this folder
         for (const file of folderData.files.sort((a, b) => a.name.localeCompare(b.name))) {
-            const fileFuncsPct = file.funcs > 0 ? Math.round((file.funcsCov / file.funcs) * 100) : 0;
             const fileLinesPct = file.lines > 0 ? Math.round((file.linesCov / file.lines) * 100) : 0;
-            const fileFuncsFail = file.funcs > 0 && fileFuncsPct < TEST_FUNC_THRESH;
-            const fileLinesFail = file.lines > 0 && fileLinesPct < TEST_LINE_THRESH;
-
-            // Use full normalized file path as key for clarity
-            let fileDisplay = `   ${file.name.substring(0, FILE_WIDTH - 3)}`;
-            fileDisplay = fileDisplay.padEnd(FILE_WIDTH);
-
-            const funcsDisplay =
-                file.funcs > 0 ? formatPercent(fileFuncsPct, fileFuncsFail, file.ignored) : '    -'.padStart(PERCENT_WIDTH);
+            const fileLinesFail = file.lines > 0 && !file.hasIgnoredLines && fileLinesPct < TEST_LINE_THRESH;
             const linesDisplay =
-                file.lines > 0 ? formatPercent(fileLinesPct, fileLinesFail, file.ignored) : '    -'.padStart(PERCENT_WIDTH);
+                file.lines > 0
+                    ? formatPercent(fileLinesPct, fileLinesFail, file.ignored || file.hasIgnoredLines)
+                    : '    -'.padStart(PERCENT_WIDTH);
+
+            const fileFuncsPct = file.funcs > 0 ? Math.round((file.funcsCov / file.funcs) * 100) : 0;
+            const hasIgnoredFuncs = file.ignoredFuncs.size > 0;
+            const fileFuncsFail = file.funcs > 0 && !hasIgnoredFuncs && fileFuncsPct < TEST_FUNC_THRESH;
+            const funcsDisplay = formatPercent(fileFuncsPct, fileFuncsFail, file.ignored || hasIgnoredFuncs);
+
+            let fileDisplay = `   ${file.name.substring(0, FILE_WIDTH - 3)}`.padEnd(FILE_WIDTH);
+            fileDisplay =
+                fileFuncsFail || fileLinesFail
+                    ? red`${fileDisplay.replace(' ', '•')}`
+                    : green`·` + grey`${fileDisplay.substring(1)}`;
 
             tableData.push({
-                name: fileFuncsFail || fileLinesFail ? red`${fileDisplay}` : grey`${fileDisplay}`,
-                funcs: funcsDisplay,
+                name: fileDisplay,
                 lines: linesDisplay,
+                funcs: funcsDisplay,
                 uncov: formatUncovered(file.uncovered),
             });
 

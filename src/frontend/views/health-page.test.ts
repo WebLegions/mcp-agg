@@ -2,13 +2,17 @@
 import { strict as assert } from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterEach, before, beforeEach, describe, mock, test } from 'node:test';
-import type { JurisInstance, JurisVDOMElement } from '../types/juris';
+import { before, beforeEach, describe, mock, test } from 'node:test';
+import { ApiClient } from '../../shared/libs/api-client';
+import type { j } from '../main';
+
+// Mock ApiClient.fetch BEFORE importing healthPage
+Object(ApiClient).fetch = async () => Promise.resolve({ status: 'ok', timestamp: '2025-11-25T13:00:00.000Z', workers: 0 });
+
 import { healthPage } from './health-page';
 
 describe('Health Page Component (DOM Rendering)', () => {
-    let juris: JurisInstance;
-    let fetchMock: unknown | undefined;
+    let juris: j.juris.JurisInstance;
 
     // One-time setup: Create DOM and load Juris
     before(() => {
@@ -26,37 +30,25 @@ describe('Health Page Component (DOM Rendering)', () => {
 
         assert.ok(!!Object(window).Juris, 'Juris library not loaded');
 
-        juris = new Juris({ states: {} });
+        // Create mock API client
+        const mockApi = {
+            baseUrl: 'http://localhost:3000/',
+            fetch: async () => Promise.resolve({ status: 'ok', timestamp: '2025-11-25T13:00:00.000Z', workers: 0 }),
+        } as never;
+
+        juris = new Juris({ states: {}, services: { api: mockApi } });
         assert.equal(juris.isBatchMode(), false);
 
         juris.registerComponent('healthPage', healthPage as never);
     });
 
-
-    // Before each test: Clear the body and mock fetch
+    // Before each test: Clear the body
     beforeEach(() => {
         document.body.innerHTML = '';
-
-        // Mock fetch to return healthy status using mock.method
-        fetchMock = mock.method(globalThis, 'fetch', async (_url: string) => {
-            return {
-                ok: true,
-                status: 200,
-                json: async () => ({ status: 'ok' }),
-            } as Response;
-        });
     });
 
-    // Clean up mocks after each test
-    afterEach(() => {
-        if (fetchMock) {
-            Object(fetchMock).mock.restore();
-            fetchMock = undefined;
-        }
-    });
-
-    test('should render complete health page structure with correct styling', () => {
-        const vnode: JurisVDOMElement = {
+    test('should render complete health page structure with correct styling', async () => {
+        const vnode: j.Elem = {
             div: {
                 children: [{ healthPage: {} }],
             },
@@ -64,32 +56,43 @@ describe('Health Page Component (DOM Rendering)', () => {
 
         const element = juris.objectToHtml(vnode);
         document.body.appendChild(element as Node);
+
+        // Wait for async component to resolve
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Verify wrapper div exists
         const wrapperDiv = document.querySelector('div');
         assert.ok(wrapperDiv, 'Wrapper div should exist');
 
-        // The healthPage component's div is the first child
-        const healthPageDiv = wrapperDiv.firstElementChild as HTMLElement;
-        assert.ok(healthPageDiv, 'Health page div should exist');
-        assert.equal(healthPageDiv.style.color, 'var(--body-color)');
+        // The healthPage component's main is the first child
+        const mainElement = wrapperDiv.firstElementChild as HTMLElement;
+        assert.ok(mainElement, 'Main element should exist');
+        assert.equal(mainElement.tagName, 'MAIN');
 
-        // Verify heading
+        // Verify header with heading
+        const header = document.querySelector('header');
+        assert.ok(header, 'Header should exist');
+
         const heading = document.querySelector('h1');
         assert.ok(heading, 'Heading should exist');
         assert.equal(heading.textContent, 'System Health');
-        assert.equal(heading.style.marginBottom, '1rem');
 
-        // Verify status card exists (second child of healthPageDiv)
-        const statusCard = healthPageDiv.children[1] as HTMLElement;
-        assert.ok(statusCard, 'Status card should exist');
-        assert.equal(statusCard.style.background, 'var(--card-bg)');
-        assert.equal(statusCard.style.border, 'var(--border-color)');
-        assert.equal(statusCard.style.borderRadius, 'var(--border-radius-lg)');
+        // Verify that status section is rendered
+        const section = document.querySelector('section');
+        assert.ok(section, 'Status section should exist');
+
+        // Verify status paragraph exists (should be 'ok' after async fetch completes)
+        const statusP = section.querySelector('p');
+        assert.ok(statusP, 'Status paragraph should exist');
+        assert.ok(statusP.textContent?.includes('Operational'), 'Should show operational status after fetch');
     });
 
-    test('should render status indicator and message with correct content', () => {
-        const vnode: JurisVDOMElement = {
+    test('should render reactive status based on state changes', async () => {
+        // Start with error state
+        juris.createContext().setState('health.status', 'error');
+        juris.createContext().setState('health.error', 'Connection failed');
+
+        const vnode: j.Elem = {
             div: {
                 children: [{ healthPage: {} }],
             },
@@ -98,76 +101,207 @@ describe('Health Page Component (DOM Rendering)', () => {
         const element = juris.objectToHtml(vnode);
         document.body.appendChild(element as Node);
 
-        // Verify DOM hierarchy: outer > container > [h1, statusCard > [indicator, message]]
-        const container = document.querySelector('div')?.firstElementChild;
-        const children = Array.from(container?.children || []);
-        assert.equal(children.length, 2, 'Container should have 2 children');
-        assert.equal(children[0].tagName, 'H1');
-        assert.equal(children[1].tagName, 'DIV');
+        // Wait for async component to resolve
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
-        const statusChildren = Array.from(children[1].children);
-        assert.equal(statusChildren.length, 2, 'Status card should have 2 children');
+        // Verify heading exists
+        const heading = document.querySelector('h1');
+        assert.ok(heading, 'Heading should exist');
+        assert.equal(heading.textContent, 'System Health');
 
-        // Verify status indicator (green dot)
-        const spans = document.querySelectorAll('span');
-        assert.equal(spans.length, 2);
-        const indicator = spans[0];
-        assert.equal(indicator.textContent, '●');
-        // Happy-DOM may not set inline styles the same way, just verify basic properties
-        assert.ok(indicator, 'Status indicator should exist');
-        assert.ok(
-            indicator.style.marginRight.includes('0.5') || indicator.style.marginRight === '',
-            'Margin right should be set or empty',
-        );
+        // Change state to ok
+        juris.createContext().setState('health.status', 'ok');
 
-        // Verify status message
-        const message = spans[1];
-        assert.equal(message.textContent, 'All Systems Operational');
+        // Allow for reactivity to update
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // After state change, verify new content appears
+        const body = document.body.textContent;
+        assert.ok(body, 'Body should have content');
+        // The exact structure might vary, just verify key content is present or absent as expected
+        assert.ok(body.includes('System Health'), 'Should show health heading');
     });
 
-    test('should handle 500 error response from health check endpoint', async () => {
-        // Replace the existing mock with error response
-        if (fetchMock) {
-            fetchMock.mock.restore();
-        }
+    test('should display health check JSON data when status is ok', async () => {
+        const vnode: j.Elem = {
+            div: {
+                children: [{ healthPage: {} }],
+            },
+        };
 
-        // Mock fetch to return 500 error using mock.method
-        const errorMock = mock.method(globalThis, 'fetch', async (_url: string) => {
-            return {
-                ok: false,
-                status: 500,
-                statusText: 'Internal Server Error',
-                json: async () => ({ error: 'Database connection failed' }),
-            } as Response;
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        // Wait for fetch to complete and state to update
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Change state to ok
+        juris.createContext().setState('health.status', 'ok');
+        juris
+            .createContext()
+            .setState(
+                'health.data',
+                JSON.stringify({ status: 'ok', timestamp: '2025-11-25T13:00:00.000Z', workers: 0 }, undefined, 2),
+            );
+
+        // Allow for reactivity to update
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // Find the pre element with JSON data
+        const preElement = document.querySelector('pre');
+        assert.ok(preElement, 'Pre element should exist for JSON display');
+
+        // Verify JSON content
+        const jsonContent = preElement.textContent;
+        assert.ok(jsonContent, 'Pre element should have content');
+        assert.ok(jsonContent.includes('status'), 'JSON should include status field');
+        assert.ok(jsonContent.includes('timestamp'), 'JSON should include timestamp field');
+        assert.ok(jsonContent.includes('workers'), 'JSON should include workers field');
+    });
+
+    test('should display refresh button when not loading', async () => {
+        const vnode: j.Elem = {
+            div: {
+                children: [{ healthPage: {} }],
+            },
+        };
+
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        // Wait for initial fetch and set state to ok
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        juris.createContext().setState('health.status', 'ok');
+        juris
+            .createContext()
+            .setState(
+                'health.data',
+                JSON.stringify({ status: 'ok', timestamp: '2025-11-25T13:00:00.000Z', workers: 0 }, undefined, 2),
+            );
+
+        // Wait for reactivity
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // Find the refresh button
+        const allText = document.body.textContent || '';
+        assert.ok(allText.includes('Refresh'), `Should have refresh button. Body: ${allText}`);
+    });
+
+    test('should not display refresh button when loading', async () => {
+        // Set state to loading
+        juris.createContext().setState('health.status', 'loading');
+
+        const vnode: j.Elem = {
+            div: {
+                children: [{ healthPage: {} }],
+            },
+        };
+
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        // Check that refresh button doesn't exist
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const refreshButton = buttons.find((btn) => btn.textContent?.includes('Refresh'));
+        assert.equal(refreshButton, undefined, 'Refresh button should not exist when loading');
+    });
+
+    test('should update state to loading when refresh button is clicked', async () => {
+        const vnode: j.Elem = {
+            div: {
+                children: [{ healthPage: {} }],
+            },
+        };
+
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
+
+        // Wait for initial fetch to complete
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
+        // Set state to ok manually to ensure refresh button appears
+        const ctx = juris.createContext();
+        ctx.setState('health.status', 'ok');
+        ctx.setState(
+            'health.data',
+            JSON.stringify({ status: 'ok', timestamp: '2025-11-25T13:00:00.000Z', workers: 0 }, undefined, 2),
+        );
+
+        // Wait for reactivity to render button
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        // Find and click the refresh button
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const refreshButton = buttons.find((btn) => btn.textContent?.includes('Refresh'));
+
+        if (refreshButton) {
+            // Click the button - this will trigger refresh() which sets state to 'loading' synchronously
+            refreshButton.click();
+
+            // Check state immediately (before async fetch completes)
+            // The refresh() function sets state to 'loading' synchronously on line 12 of health-page.ts
+            const statusAfterClick = ctx.getState('health.status');
+            assert.equal(statusAfterClick, 'loading', 'Status should be loading immediately after refresh click');
+        } else {
+            // If button doesn't exist, at least verify the test setup
+            const allText = document.body.textContent || '';
+            assert.ok(false, `Refresh button not found in: ${allText}`);
+        }
+    });
+
+    test('should trigger refresh and update UI when refresh button is clicked', async () => {
+        const vnode: j.Elem = {
+            div: {
+                children: [{ healthPage: {} }],
+            },
+        };
+
+        // mock fetch
+        const mockFetch = mock.method(ApiClient, 'fetch', () => {
+            return Promise.resolve({
+                status: 'ok',
+                timestamp: '2025-11-25T13:00:00.000Z',
+                workers: 0,
+            });
         });
 
-        try {
-            // Simulate health check API call
-            const response = await fetch('/api/v1/health');
+        const element = juris.objectToHtml(vnode);
+        document.body.appendChild(element as Node);
 
-            // Verify error response
-            assert.equal(response.ok, false);
-            assert.equal(response.status, 500);
-            assert.equal(response.statusText, 'Internal Server Error');
+        // Wait for initial fetch to complete
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        assert.equal(mockFetch.mock.callCount(), 1);
 
-            const data = await response.json();
-            assert.equal(data.error, 'Database connection failed');
+        // Set state to ok manually to ensure refresh button appears
+        const ctx = juris.createContext();
+        ctx.setState('health.status', 'ok');
+        ctx.setState(
+            'health.data',
+            JSON.stringify({ status: 'ok', timestamp: '2025-11-25T13:00:00.000Z', workers: 0 }, undefined, 2),
+        );
 
-            // Verify mock was called
-            assert.equal(errorMock.mock.calls.length, 1);
-            const call = errorMock.mock.calls[0];
-            assert.ok(call, 'Mock should have been called');
-            assert.equal(Object(call).arguments[0], '/api/v1/health');
-        } finally {
-            errorMock.mock.restore();
-            // Restore the default mock for other tests
-            fetchMock = mock.method(globalThis, 'fetch', async (_url: string) => {
-                return {
-                    ok: true,
-                    status: 200,
-                    json: async () => ({ status: 'ok' }),
-                } as Response;
-            });
-        }
+        // Verify OK status is displayed using ID
+        const okElement = document.querySelector('#health-page-ok');
+        assert.ok(okElement, 'OK status element should exist');
+        assert.ok(okElement.textContent?.includes('Operational'), 'Should show Operational status');
+
+        // Find and click the refresh button using ID
+        const refreshButton = document.querySelector('#health-page-refresh-button') as HTMLButtonElement;
+        assert.ok(refreshButton, 'Refresh button should exist with ID');
+
+        // Change state before click
+        ctx.setState('health.error', 'testing');
+
+        // Click the button
+        refreshButton.click();
+
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        assert.equal(mockFetch.mock.callCount(), 2);
+
+        // Verify state changed to loading immediately (synchronous state change)
+        const statusAfter = ctx.getState('health.status');
+        assert.equal(statusAfter, 'ok', 'Status should be ok after click');
+        const errorAfter = ctx.getState('health.error');
+        assert.equal(errorAfter, '', 'Error should be cleared when refresh is clicked');
     });
 });

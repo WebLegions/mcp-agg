@@ -5,7 +5,7 @@ import { hookConsole, logger } from './utils';
 hookConsole(logger);
 
 // Create and configure Fastify app
-export const app = createServer();
+export const app = await createServer();
 await registerRoutes(app);
 
 // Auto-start server when run directly (not imported)

@@ -2,7 +2,7 @@ import { createInterface } from 'node:readline';
 import * as readline from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { connectToMCPServer, getManager, type MCPServerConfig, registerMCPServerTools } from '../controllers/mcp-controller';
-import { MCPConfigManager } from '../controllers/mcp-controller/config';
+import { MCPConfigManager } from '../controllers/mcp-controller/config-file';
 import { type JSONRPCMessage, MCPServer, McpError } from '../libs/mcp-server';
 import { green, red, yellow } from '../utils';
 
@@ -410,14 +410,18 @@ async function addCommand(manager: MCPConfigManager, args: string[], options: Re
             console.log('⚠ Skipping validation (--force flag used)');
         }
 
-        await manager.upsertServer(serverConfig);
+        await manager.create(serverConfig);
         console.log(`✓ Added MCP server: ${name}`);
         console.log(JSON.stringify(serverConfig, null, 2));
         return 0;
     } catch (err) {
         const error = new McpError(err);
-        console.error('✗ Failed to add server:', error);
-        console.error('  Use --force to skip validation');
+        if (error.message.includes('already exists')) {
+            console.error('✗ Server already exists. Use remove command first or choose a different name.');
+        } else {
+            console.error('✗ Failed to add server:', error);
+            console.error('  Use --force to skip validation');
+        }
         return 1;
     } finally {
         manager.cleanup();
@@ -518,13 +522,17 @@ async function interactiveAddCommand(
                   )
                 : MCPConfigManager.create(name, transport as 'sse' | 'http', commandOrUrl, undefined, envMap, true);
 
-        await manager.upsertServer(serverConfig);
+        await manager.create(serverConfig);
         console.log(`✓ Added MCP server: ${name}`);
         console.log(JSON.stringify(serverConfig, null, 2));
         return 0;
     } catch (err) {
         const error = new McpError(err);
-        console.error('✗ Failed to add server:', error);
+        if (error.message.includes('already exists')) {
+            console.error('✗ Server already exists. Use remove command first or choose a different name.');
+        } else {
+            console.error('✗ Failed to add server:', error);
+        }
         return 1;
     } finally {
         rl.close();
@@ -544,16 +552,16 @@ async function removeCommand(manager: ReturnType<typeof getManager>, args: strin
     }
 
     try {
-        const removed = await manager.removeServer(name);
-        if (removed) {
-            console.log(`✓ Removed MCP server: ${name}`);
-            return 0;
-        }
-        console.error(`Server not found: ${name}`);
-        return 1;
+        await manager.delete(name);
+        console.log(`✓ Removed MCP server: ${name}`);
+        return 0;
     } catch (err) {
         const error = new McpError(err);
-        console.error('Failed to remove server:', error);
+        if (error.message.includes('not found')) {
+            console.error(`Server not found: ${name}`);
+        } else {
+            console.error('Failed to remove server:', error);
+        }
         return 1;
     }
 }
@@ -563,7 +571,7 @@ async function removeCommand(manager: ReturnType<typeof getManager>, args: strin
  */
 async function listCommand(manager: ReturnType<typeof getManager>, options: Record<string, unknown> = {}): Promise<number> {
     try {
-        const allServers = await manager.getAllServers();
+        const allServers = await manager.find();
         // Filter out builtin server from user-facing list (it's internal and always present)
         const servers = allServers.filter((s) => s.name !== 'builtin');
 
@@ -640,7 +648,7 @@ async function getCommand(manager: ReturnType<typeof getManager>, args: string[]
     }
 
     try {
-        const server = await manager.getServer(name);
+        const server = await manager.find(name);
 
         if (!server) {
             console.error(`Server not found: ${name}`);
@@ -696,7 +704,7 @@ async function enableCommand(manager: ReturnType<typeof getManager>, args: strin
     }
 
     try {
-        await manager.enable(name, enabled);
+        await manager.update(name, { enabled });
         console.log(`✓ MCP server '${name}' ${enabled ? 'enabled' : 'disabled'}`);
     } catch (error) {
         console.error(
@@ -729,11 +737,16 @@ async function addJsonCommand(manager: ReturnType<typeof getManager>, args: stri
             ...config,
         };
 
-        await manager.upsertServer(serverConfig);
+        await manager.create(serverConfig);
         console.log(`✓ Added MCP server: ${name}`);
         console.log(JSON.stringify(serverConfig, null, 2));
     } catch (error) {
-        console.error(`Failed to add server from JSON: ${error instanceof Error ? error.message : String(error)}`);
+        const err = error instanceof Error ? error : new Error(String(error));
+        if (err.message.includes('already exists')) {
+            console.error('✗ Server already exists. Use remove command first or choose a different name.');
+        } else {
+            console.error(`Failed to add server from JSON: ${err.message}`);
+        }
         return 1;
     }
 

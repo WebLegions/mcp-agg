@@ -3,12 +3,11 @@ import { strict as assert } from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { before, beforeEach, describe, test } from 'node:test';
-import type { AppComponent, AppContext } from '../main';
-import type { JurisInstance, JurisVDOMElement } from '../types/juris';
+import type { j } from '../main';
 
 describe('AppShell Component (DOM Rendering)', () => {
-    let juris: JurisInstance;
-    let appShell: AppComponent;
+    let juris: j.juris.JurisInstance;
+    let appShell: j.Component;
 
     // One-time setup: Create DOM and load Juris
     before(async () => {
@@ -37,7 +36,7 @@ describe('AppShell Component (DOM Rendering)', () => {
         appShell = appShellModule.appShell;
 
         // Create a wrapper that provides necessary context
-        const appShellWrapper = (props: Record<string, unknown>, ctx: AppContext) => {
+        const appShellWrapper = (props: Record<string, unknown>, ctx: j.Context) => {
             // Mock router, config, and api in context
             const mockRouter = {
                 getState: () => 'url.path',
@@ -55,7 +54,7 @@ describe('AppShell Component (DOM Rendering)', () => {
             };
 
             const mockConfig = {
-                loadServers: () => Promise.resolve(),
+                find: () => Promise.resolve(),
             };
 
             const mockApi = {};
@@ -66,7 +65,7 @@ describe('AppShell Component (DOM Rendering)', () => {
                 router: mockRouter,
                 config: mockConfig,
                 api: mockApi,
-            } as unknown as AppContext;
+            } as unknown as j.Context;
 
             // Call original appShell with mocked context
             return appShell(props, contextWithMocks);
@@ -90,7 +89,7 @@ describe('AppShell Component (DOM Rendering)', () => {
                 children: props.image ? [{ svg: props.image }] : [],
             },
         })) as never);
-        juris.registerComponent('themeSwitch', (() => ({ div: { class: 'theme-switch' } })) as never);
+        juris.registerComponent('themeToggle', (() => ({ div: { class: 'theme-switch' } })) as never);
         juris.registerComponent('envModal', (() => ({ div: { class: 'env-modal' } })) as never);
     });
 
@@ -100,7 +99,7 @@ describe('AppShell Component (DOM Rendering)', () => {
     });
 
     test('should render main layout structure with nav, main, and footer', () => {
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {
@@ -136,7 +135,7 @@ describe('AppShell Component (DOM Rendering)', () => {
     });
 
     test('should render bottom-right controls with info icon and theme switch', () => {
-        const vnode: JurisVDOMElement = {
+        const vnode: j.Elem = {
             div: {
                 children: [
                     {
@@ -164,7 +163,46 @@ describe('AppShell Component (DOM Rendering)', () => {
         assert.ok(icons.length > 0, 'Control icons should exist');
 
         // Verify theme switch
-        const themeSwitch = controls.querySelector('.theme-switch');
-        assert.ok(themeSwitch, 'Theme switch should exist');
+        const themeToggle = controls.querySelector('.theme-switch');
+        assert.ok(themeToggle, 'Theme switch should exist');
+    });
+
+    test('registerAppShell should register all required components', async () => {
+        // Import registerAppShell
+        const { registerAppShell } = await import('./app-shell');
+
+        // Create a fresh Juris instance for testing
+        const testJuris = new Juris({ states: {} });
+
+        // Register components using registerAppShell
+        registerAppShell(testJuris as never);
+
+        // Verify that key components are registered
+        const expectedComponents = [
+            'icon',
+            'modal',
+            'menu',
+            'serverRow',
+            'envModal',
+            'navBar',
+            'appShell',
+            'themeToggle',
+            'serverModal',
+            'configPage',
+            'healthPage',
+            'swaggerPage',
+        ];
+
+        // Check if components can be rendered (this confirms they're registered)
+        for (const componentName of expectedComponents) {
+            const vnode = { [componentName]: {} };
+            try {
+                // If component is registered, objectToHtml won't throw
+                testJuris.objectToHtml(vnode as never);
+                assert.ok(true, `Component ${componentName} should be registered`);
+            } catch (error) {
+                assert.fail(`Component ${componentName} should be registered but threw: ${error}`);
+            }
+        }
     });
 });

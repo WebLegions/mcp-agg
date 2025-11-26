@@ -36,6 +36,11 @@ export class MCPConfigManager extends EventEmitter {
     private _configPath: string;
     private _watcher: FSWatcher | undefined;
 
+    /** Get the config file path (for testing) */
+    get configPath(): string {
+        return this._configPath;
+    }
+
     constructor(
         configPath?: string,
         private _watch = true,
@@ -85,8 +90,10 @@ export class MCPConfigManager extends EventEmitter {
         if (!config) {
             console.warn('Returning empty config.');
             config = { mcpServers: new Map() };
+        }
 
-            // start with builtngin server
+        // Always ensure builtin server is present
+        if (!config.mcpServers.has('builtin')) {
             config.mcpServers.set('builtin', {
                 name: 'builtin',
                 transport: 'stdio',
@@ -119,19 +126,22 @@ export class MCPConfigManager extends EventEmitter {
         }
 
         // Write config - convert Maps to plain objects for JSON serialization
+        // Filter out builtin server (it's added automatically on read)
         const serializableConfig = {
             mcpServers: Object.fromEntries(
-                Array.from(config.mcpServers.entries()).map(([name, value]) => {
-                    const { env, ...rest } = value;
-                    return [
-                        name,
-                        {
-                            ...rest,
-                            // Convert env Map to object if present
-                            env: env ? Object.fromEntries(env) : undefined,
-                        },
-                    ];
-                }),
+                Array.from(config.mcpServers.entries())
+                    .filter(([name]) => name !== 'builtin')
+                    .map(([name, value]) => {
+                        const { env, ...rest } = value;
+                        return [
+                            name,
+                            {
+                                ...rest,
+                                // Convert env Map to object if present
+                                env: env ? Object.fromEntries(env) : undefined,
+                            },
+                        ];
+                    }),
             ),
         };
         const content = JSON.stringify(serializableConfig, null, 2);
@@ -147,10 +157,143 @@ export class MCPConfigManager extends EventEmitter {
         }
     }
 
+    /**
+     * Find server(s) - returns all servers or a specific server by name
+     * @param name - Optional server name to find a specific server
+     * @returns Array of all servers, or array with single server if name provided
+     */
+    async find(): Promise<MCPServerConfig[]>;
+    async find(name: string): Promise<MCPServerConfig | undefined>;
+    async find(name?: string): Promise<MCPServerConfig[] | MCPServerConfig | undefined> {
+        const config = await this.read();
+        if (name) {
+            return config.mcpServers.get(name);
+        }
+        return Array.from(config.mcpServers.values());
+    }
+
+    /**
+     * Create a new server configuration
+     * @param serverConfig - Server configuration to create
+     * @returns The created server configuration
+     */
+    async create(serverConfig: MCPServerConfig): Promise<MCPServerConfig> {
+        this.isValidServer(serverConfig);
+        const config = await this.read();
+
+        // Check if server already exists
+        if (config.mcpServers.has(serverConfig.name)) {
+            throw new McpError(`Server "${serverConfig.name}" already exists`);
+        }
+
+        config.mcpServers.set(serverConfig.name, serverConfig);
+        await this.write(config);
+        return serverConfig;
+    }
+
+    /**
+     * Update an existing server configuration
+     * @param name - Server name to update
+     * @param updates - Partial server configuration to update
+     * @returns The updated server configuration
+     */
+    async update(name: string, updates: Partial<MCPServerConfig>): Promise<MCPServerConfig> {
+        const config = await this.read();
+        const server = config.mcpServers.get(name);
+        if (!server) {
+            throw new McpError(`Server "${name}" not found`);
+        }
+
+        // Merge updates into existing server config
+        const updated = { ...server, ...updates } as MCPServerConfig;
+        this.isValidServer(updated);
+        config.mcpServers.set(name, updated);
+        await this.write(config);
+        return updated;
+    }
+
+    /**
+     * Delete a server configuration
+     * @param name - Server name to delete
+     */
+    async delete(name: string): Promise<void> {
+        // Prevent removing builtin server
+        if (name === 'builtin') {
+            throw new McpError('Cannot remove builtin server');
+        }
+
+        const config = await this.read();
+        if (!config.mcpServers.has(name)) {
+            throw new McpError(`Server "${name}" not found`);
+        }
+
+        config.mcpServers.delete(name);
+        await this.write(config);
+    }
+
     // ============================================================================
-    // Server Config Creation & Validation
+    // Legacy/Deprecated Methods (kept for backward compatibility)
     // ============================================================================
 
+    /** @deprecated Use find() instead */
+    async getAllServers(): Promise<MCPServerConfig[]> {
+        return (await this.find()) as MCPServerConfig[];
+    }
+
+    /** @deprecated Use find(name) instead */
+    async getServer(name: string): Promise<MCPServerConfig | undefined> {
+        return await this.find(name);
+    }
+
+    /** @deprecated Use create() or update() instead */
+    async upsertServer(serverConfig: MCPServerConfig): Promise<void> {
+        const existing = await this.find(serverConfig.name);
+        if (existing) {
+            await this.update(serverConfig.name, serverConfig);
+        } else {
+            await this.create(serverConfig);
+        }
+    }
+
+    /** @deprecated Use delete() instead */
+    async removeServer(name: string): Promise<boolean> {
+        try {
+            await this.delete(name);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async serverExists(name: string): Promise<boolean> {
+        const server = await this.find(name);
+        return server !== undefined;
+    }
+
+    async getEnabled(): Promise<MCPServerConfig[]> {
+        const servers = (await this.find()) as MCPServerConfig[];
+        return servers.filter((s) => s.enabled);
+    }
+
+    /** @deprecated Use update(name, { enabled }) instead */
+    async enable(name: string, enabled: boolean): Promise<void> {
+        await this.update(name, { enabled });
+    }
+
+    // ============================================================================
+    // Static Factory Method
+    // ============================================================================
+
+    /**
+     * Static factory method to create server configurations
+     * @param name - Server name
+     * @param transport - Transport type (stdio, sse, http)
+     * @param commandOrUrl - Command for stdio or URL for sse/http
+     * @param args - Optional command arguments for stdio
+     * @param env - Optional environment variables
+     * @param enabled - Whether server is enabled (default: true)
+     * @returns Server configuration object
+     */
     static create(
         name: string,
         transport: MCPTransport,
@@ -171,57 +314,6 @@ export class MCPConfigManager extends EventEmitter {
             return config;
         }
         throw new McpError(`Unsupported transport type: ${transport}`);
-    }
-
-    async getAllServers(): Promise<MCPServerConfig[]> {
-        const config = await this.read();
-        return Array.from(config.mcpServers.values());
-    }
-
-    async getServer(name: string): Promise<MCPServerConfig | undefined> {
-        const config = await this.read();
-        return config.mcpServers.get(name);
-    }
-
-    async upsertServer(serverConfig: MCPServerConfig): Promise<void> {
-        this.isValidServer(serverConfig);
-        const config = await this.read();
-        config.mcpServers.set(serverConfig.name, serverConfig);
-        await this.write(config);
-        // writeConfig already handles event emission
-    }
-
-    async removeServer(name: string): Promise<boolean> {
-        const config = await this.read();
-        if (!config.mcpServers.has(name)) {
-            return false;
-        }
-
-        config.mcpServers.delete(name);
-        await this.write(config);
-        // writeConfig already handles event emission
-        return true;
-    }
-
-    async serverExists(name: string): Promise<boolean> {
-        const server = await this.getServer(name);
-        return server !== undefined;
-    }
-
-    async getEnabled(): Promise<MCPServerConfig[]> {
-        const servers = await this.getAllServers();
-        return servers.filter((s) => s.enabled);
-    }
-
-    async enable(name: string, enabled: boolean): Promise<void> {
-        const config = await this.read();
-        const server = config.mcpServers.get(name);
-        if (!server) {
-            throw new McpError(`Server "${name}" not found`);
-        }
-
-        server.enabled = enabled;
-        await this.write(config);
     }
 
     /**

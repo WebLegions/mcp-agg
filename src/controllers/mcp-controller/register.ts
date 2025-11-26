@@ -7,7 +7,7 @@ import { connectionPool, HttpClient, InternalClient, type MCPClient, SseClient, 
 import { MCPServer, McpError, type ToolResult } from '../../libs/mcp-server';
 import type { MCPServerConfig } from '../../shared/types/mcp-config';
 import { Env } from '../../utils';
-import { getManager } from './config';
+import { getManager } from './config-file';
 
 /**
  * Connect to an MCP server based on its configuration

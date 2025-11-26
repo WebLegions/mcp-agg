@@ -16,14 +16,20 @@ async function registerHelmet(app: FastifyInstance) {
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
-                // In development, allow localhost for API testing from Scalar UI
-                connectSrc: isDev ? ["'self'", `http://localhost:${port}`, `ws://localhost:${port}`] : ["'self'"],
+                // In development, allow localhost AND remote APIs for apiBase feature
+                connectSrc: isDev
+                    ? ["'self'", `http://localhost:${port}`, `ws://localhost:${port}`, 'https:', 'http:']
+                    : ["'self'"],
                 // Scalar API Reference from jsdelivr CDN (requires unsafe-eval for Vue reactivity)
                 styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
                 scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'https://cdn.jsdelivr.net'],
                 scriptSrcElem: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
                 imgSrc: ["'self'", 'data:', 'https:'],
                 fontSrc: ["'self'", 'data:', 'https://cdn.jsdelivr.net', 'https://fonts.scalar.com'],
+                // Allow blob: URLs for Scalar API downloads (used in /api/v1/swagger iframe)
+                frameSrc: ["'self'", 'blob:'],
+                // Prevent object/embed exploitation
+                objectSrc: ["'none'"],
             },
         },
         hsts: {

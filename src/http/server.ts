@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getSystemErrorName } from 'node:util';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -15,6 +16,13 @@ import { registerStatic } from './static';
 import { registerSwagger } from './swagger';
 import { registerEnvInject, registerTranspile } from './transpile';
 import { type Provider, schemaCompiler, serializerCompiler } from './type-provider';
+
+/**
+ * Type alias for our Fastify app instance (supports both HTTP/1.1 and HTTP/2)
+ * We use 'never' for generics to avoid type conflicts between HTTP/1.1 and HTTP/2
+ */
+// biome-ignore lint/suspicious/noExplicitAny: FastifyInstance needs flexible server type
+export type AppInstance = FastifyInstance<any, any, any, any, any>;
 
 /**
  * Get user-friendly error message from any error type
@@ -72,15 +80,66 @@ function getErrorMessage(err: unknown, port?: number): string {
 }
 
 /**
- * Create and configure Fastify server instance
+ * Load TLS certificate and key files for HTTPS/HTTP2
+ * Returns undefined if cert paths are not configured (plain HTTP mode)
  */
-export function createServer() {
+async function loadTlsConfig() {
+    const certPath = Env.get('TLS_CERT_PATH', '');
+    const keyPath = Env.get('TLS_KEY_PATH', '');
+
+    // Skip HTTPS if cert paths not configured
+    if (!certPath || !keyPath) {
+        return undefined;
+    }
+
+    try {
+        const [cert, key] = await Promise.all([readFile(certPath, 'utf8'), readFile(keyPath, 'utf8')]);
+
+        return {
+            key,
+            cert,
+            allowHTTP1: true, // ALPN: fallback to HTTP/1.1 for legacy clients
+        };
+    } catch (err) {
+        console.error(`Failed to load TLS certificates: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(`  TLS_CERT_PATH: ${certPath}`);
+        console.error(`  TLS_KEY_PATH: ${keyPath}`);
+        throw err;
+    }
+}
+
+/**
+ * Get optimized HTTP/2 settings based on article recommendations
+ * @see https://medium.com/@connect.hashblock/7-node-js-tls-http-2-3-tweaks-for-faster-handshakes-12326355828b
+ */
+function getHttp2Settings() {
+    return {
+        enablePush: false, // HTTP/2 push is effectively deprecated
+        initialWindowSize: Env.get('HTTP2_INITIAL_WINDOW_SIZE', 1024 * 1024), // 1 MiB: reduces early stalls
+        headerTableSize: Env.get('HTTP2_HEADER_TABLE_SIZE', 16 * 1024), // 16 KiB: enough for typical header sets
+        maxConcurrentStreams: Env.get('HTTP2_MAX_CONCURRENT_STREAMS', 100), // tune per backend capacity
+    };
+}
+
+/**
+ * Create and configure Fastify server instance
+ * Supports both HTTP/1.1 and HTTP/2 (HTTP/2 requires HTTPS)
+ */
+export async function createServer(): Promise<AppInstance> {
+    const https = await loadTlsConfig();
+
     const app = Fastify({
         logger: false, // Using plain console instead of pino
         bodyLimit: fromHumanBytes(Env.get('MAX_BODY_SIZE', '10mb')),
         routerOptions: {
             maxParamLength: Env.get('MAX_URL_LENGTH', 4096),
         },
+        // HTTP/2 configuration - only enable with HTTPS (h2c not widely supported by clients)
+        ...(https && {
+            http2: true,
+            https,
+            http2SessionTimeout: Env.get('HTTP2_SESSION_TIMEOUT', 60000),
+        }),
     })
         .withTypeProvider<Provider>()
         .setValidatorCompiler(schemaCompiler)
@@ -103,13 +162,44 @@ export function createServer() {
         return JSON.stringify(payload, replacerFn, 0);
     });
 
+    // Log HTTP/2 settings and connection observability
+    if (https) {
+        const settings = getHttp2Settings();
+        console.log('HTTP/2 mode (HTTPS enabled)');
+        console.log('HTTP/2 settings:', settings);
+    } else {
+        console.log('HTTP/1.1 mode (no TLS configured)');
+    }
+
+    // Log connection protocol for observability
+    app.addHook('onRequest', async (request) => {
+        const protocol = request.raw.httpVersion;
+        const socket = request.raw.socket;
+
+        // Type guard for TLS socket
+        if ('alpnProtocol' in socket) {
+            const tlsSocket = socket as {
+                alpnProtocol?: string;
+                getProtocol?: () => string;
+                getCipher?: () => { name: string; standardName?: string; version: string };
+            };
+            const alpn = tlsSocket.alpnProtocol || 'http/1.1';
+            const tlsVersion = tlsSocket.getProtocol?.();
+            const cipher = tlsSocket.getCipher?.();
+
+            console.log(`[handshake] ${tlsVersion || 'N/A'} ${alpn} ${cipher?.standardName || cipher?.name || 'N/A'}`);
+        } else {
+            console.log(`[request] HTTP/${protocol} (plain HTTP)`);
+        }
+    });
+
     return app;
 }
 
 /**
  * Register all routes and plugins
  */
-export async function registerRoutes(app: FastifyInstance) {
+export async function registerRoutes(app: AppInstance) {
     // Security plugins FIRST (order matters!)
     await registerSecurityPlugins(app);
 
@@ -143,7 +233,7 @@ export async function registerRoutes(app: FastifyInstance) {
 /**
  * Start HTTP server
  */
-export async function startServer(app: FastifyInstance) {
+export async function startServer(app: AppInstance) {
     const port = Number.parseInt(process.env.PORT ?? '3000', 10);
     const host = process.env.HOST ?? '0.0.0.0';
 

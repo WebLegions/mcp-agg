@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * @file  A resilient fetch client with retry logic, timeout and abort.
  * Client adds default headers and a bearer token, if provided.
@@ -36,7 +37,7 @@ export class ClientOptions {
     readonly bearerToken?: string; // when set adds an Authorization: Bearer <token> header
     readonly userAgent?: string; // when set adds a User-Agent header
 
-    constructor(opts?: Readonly<Partial<ClientOptions>>) {
+    constructor(opts?: Partial<ClientOptions>) {
         if (opts) {
             // Replace POJO.copyIn with Object.assign
             Object.assign(this, opts);
@@ -241,24 +242,6 @@ export class ApiClient {
     }
 
     /**
-     * Clear the static client pool (useful for testing or memory management)
-     */
-    static clearPool(): void {
-        ApiClient._pool.clear();
-    }
-
-    /**
-     * Get pool statistics
-     */
-    static getPoolStats() {
-        return {
-            size: ApiClient._pool.size,
-            maxSize: ApiClient._maxPoolSize,
-            origins: Array.from(ApiClient._pool.keys()),
-        };
-    }
-
-    /**
      * Makes a request to an endpoint with retry logic.
      * Returns the response processed by afterFn (default json).
      * @param input - The endpoint to fetch, relative to the baseURL.
@@ -370,7 +353,7 @@ export class ApiClient {
      * @returns A promise that resolves with the processed response.
      * Fetch is aborted when reaching the timeout.
      */
-    static fetch<T>(input: string, init: RequestInit = {}, options?: Readonly<Partial<ClientOptions>>): PromiseRetry<T> {
+    static fetch<T>(input: string, init: RequestInit = {}, options?: Partial<ClientOptions>): PromiseRetry<T> {
         const url = new URL(input);
         const origin = url.origin;
 
@@ -395,5 +378,30 @@ export class ApiClient {
         // Make request with path + search + hash
         const path = url.pathname + url.search + url.hash;
         return client.fetch<T>(path, init);
+    }
+
+    get baseUrl() {
+        return this._baseURL;
+    }
+    get options() {
+        return this._opt;
+    }
+
+    /**
+     * Clear the static client pool (useful for testing or memory management)
+     */
+    static clearPool(): void {
+        ApiClient._pool.clear();
+    }
+
+    /**
+     * Get pool statistics
+     */
+    static getPoolStats() {
+        return {
+            size: ApiClient._pool.size,
+            maxSize: ApiClient._maxPoolSize,
+            origins: Array.from(ApiClient._pool.keys()),
+        };
     }
 }

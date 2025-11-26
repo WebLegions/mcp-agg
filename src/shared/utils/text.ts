@@ -66,17 +66,20 @@ export function capitalizeAll(str: string): string {
  * @returns The escaped string.
  */
 export function escapeHTML(str: string): string {
-    if (Bun && typeof Bun.escapeHTML === 'function') return Bun.escapeHTML(str);
+    // Check if Bun global exists and has escapeHTML function
+    if (typeof globalThis.Bun !== 'undefined' && typeof globalThis.Bun.escapeHTML === 'function') {
+        return globalThis.Bun.escapeHTML(str);
+    }
 
     /* istanbul ignore start **/
     // For browser environments:
-    if (!process && !!document && typeof document.createElement === 'function') {
+    if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
         const template = document.createElement('template');
         template.textContent = str;
         return template.innerHTML || str;
     }
 
-    // fallback non non-native code
+    // fallback for non-native code
     return str.replace(
         /[&<>"']/g,
         (m) =>
@@ -88,7 +91,7 @@ export function escapeHTML(str: string): string {
                 "'": '&#39;',
             })[m] || `&#38;#38;#${m.charCodeAt(0)};`,
     );
-    /* istanbul ignoe end **/
+    /* istanbul ignore end **/
 }
 
 /**
@@ -105,11 +108,21 @@ export function urlUnescape(str: string) {
 }
 
 export function b64urlEncode(str: string) {
-    return urlEscape(Buffer.from(str).toString('base64'));
+    // Use Buffer in Node.js/Bun, btoa in browser
+    if (typeof Buffer !== 'undefined') {
+        return urlEscape(Buffer.from(str).toString('base64'));
+    }
+    // Browser fallback using btoa (only works with ASCII/Latin1)
+    return urlEscape(btoa(str));
 }
 
 export function b64urlDecode(str: string) {
-    return Buffer.from(urlUnescape(str), 'base64').toString();
+    // Use Buffer in Node.js/Bun, atob in browser
+    if (typeof Buffer !== 'undefined') {
+        return Buffer.from(urlUnescape(str), 'base64').toString();
+    }
+    // Browser fallback using atob (only works with ASCII/Latin1)
+    return atob(urlUnescape(str));
 }
 
 /**

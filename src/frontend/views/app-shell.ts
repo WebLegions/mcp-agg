@@ -1,15 +1,14 @@
 import { ErrorEx } from '../../shared/utils/error';
-import { menu } from '../components/dropdown-menu';
 import { icon, infoIcon } from '../components/icon';
+import { menu } from '../components/menu';
 import { modal } from '../components/modal';
 import { type NavRoute, navBar } from '../components/nav-bar';
-import { themeSwitch } from '../components/theme-switch';
-import { type App, type AppComponent, v } from '../main';
-import { configPage } from './config-page';
+import { themeToggle } from '../components/theme-toggle';
+import type { j } from '../main';
+import { configPage, serverRow } from './config-page';
 import { envModal } from './env-modal';
 import { healthPage } from './health-page';
 import { serverModal } from './server-modal';
-import { serverRow, serverTable } from './server-table';
 import { swaggerPage } from './swagger-page';
 
 /**
@@ -31,7 +30,7 @@ const APP_ROUTES: RouteConfig[] = [
  * Wraps the main content area with persistent UI elements
  * Handles router initialization and app bootstrap
  */
-export const appShell: AppComponent = (_props, ctx) => {
+export const appShell: j.Component = (_props, ctx) => {
     // Access router and config
     const router = ctx.router;
     const config = ctx.config;
@@ -40,12 +39,10 @@ export const appShell: AppComponent = (_props, ctx) => {
     if (!router) {
         throw new ErrorEx('ctx.router is required');
     }
-    if (!config?.loadServers) {
+    if (!config?.find) {
         console.error('Config not available. config:', config);
         throw new ErrorEx('ctx.config is required');
     }
-
-    const routerKey = router.getState();
 
     // Initialize router routes and load config (only once)
     if (!Object.keys(router.getConfig().routes ?? {}).length) {
@@ -53,9 +50,6 @@ export const appShell: AppComponent = (_props, ctx) => {
         APP_ROUTES.forEach((route) => {
             router.addRoute(route.path, { component: route.component });
         });
-
-        // Async load server configurations
-        config.loadServers().catch((err: unknown) => console.error('Failed to load servers:', err));
     }
 
     return {
@@ -68,7 +62,8 @@ export const appShell: AppComponent = (_props, ctx) => {
                 {
                     main: {
                         children: () => {
-                            const currentPath = ctx.getState(routerKey, '/');
+                            // Get current path from router state for reactivity
+                            const currentPath = ctx.getState('url.path', '/');
                             const match = router.matchRoute(currentPath);
                             const name = String(match?.route?.component ?? 'configPage');
                             return [{ [name]: {} }];
@@ -118,13 +113,15 @@ export const appShell: AppComponent = (_props, ctx) => {
                             gap: '0.5rem',
                         },
                         children: [
-                            v('icon', {
-                                image: infoIcon,
-                                onClick: () => ctx.setState('ui.showEnvModal', true),
-                                ariaLabel: 'Show environment information',
-                                title: 'Environment Info',
-                            }),
-                            { themeSwitch: {} },
+                            {
+                                icon: {
+                                    image: infoIcon,
+                                    onClick: () => ctx.setState('ui.showEnvModal', true),
+                                    ariaLabel: 'Show environment information',
+                                    title: 'Environment Info',
+                                },
+                            },
+                            { themeToggle: {} },
                         ],
                     },
                 },
@@ -138,17 +135,16 @@ export const appShell: AppComponent = (_props, ctx) => {
  * Register AppShell and all required components with App
  * Consolidates all component registration in one place
  */
-export function registerAppShell(app: App) {
+export function registerAppShell(app: j.App) {
     const reg = [
         icon,
         modal,
         menu,
-        serverTable,
         serverRow,
         envModal,
         navBar,
         appShell,
-        themeSwitch,
+        themeToggle,
         serverModal,
         configPage,
         healthPage,

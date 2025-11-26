@@ -17,21 +17,21 @@ describe('HTTP Server', () => {
     });
 
     // createServer tests
-    test('should create a Fastify instance', () => {
-        const server = createServer();
+    test('should create a Fastify instance', async () => {
+        const server = await createServer();
         ok(server);
         ok(typeof server.inject === 'function');
     });
 
-    test('should configure validator compiler', () => {
-        const server = createServer();
+    test('should configure validator compiler', async () => {
+        const server = await createServer();
         ok(server);
         // If validator compiler is set, validation should work
         ok(server.validatorCompiler !== undefined);
     });
 
     test('should parse JSON with BigInt support', async () => {
-        const server = createServer();
+        const server = await createServer();
 
         // Register a test route that echoes back the body
         server.post('/test-bigint', async (request, reply) => {
@@ -62,7 +62,7 @@ describe('HTTP Server', () => {
     });
 
     test('should filter out properties starting with __', async () => {
-        const server = createServer();
+        const server = await createServer();
 
         // Register a test route that echoes back the body
         server.post('/test-proto', async (request, reply) => {
@@ -97,7 +97,7 @@ describe('HTTP Server', () => {
     });
 
     test('should handle ArrayBuffer and SharedArrayBuffer input', async () => {
-        const server = createServer();
+        const server = await createServer();
 
         server.post('/test-buffer', async (request) => {
             return request.body;
@@ -120,7 +120,7 @@ describe('HTTP Server', () => {
 
     // registerAll tests
     test('should register all routes and return working server', async () => {
-        const server = createServer();
+        const server = await createServer();
         await registerRoutes(server);
 
         // Test that routes actually work
@@ -144,7 +144,7 @@ describe('HTTP Server', () => {
     });
 
     test('should make server ready to handle requests', async () => {
-        const server = createServer();
+        const server = await createServer();
         await registerRoutes(server);
 
         // Server should be ready
@@ -159,7 +159,7 @@ describe('HTTP Server', () => {
 
     // startServer tests
     test('should start server and listen on configured port', async () => {
-        const server = createServer();
+        const server = await createServer();
         await registerRoutes(server);
 
         // Use a unique port for testing
@@ -199,8 +199,8 @@ describe('HTTP Server', () => {
     });
 
     test('should handle server startup errors', async () => {
-        const server1 = createServer();
-        const server2 = createServer();
+        const server1 = await createServer();
+        const server2 = await createServer();
         await registerRoutes(server1);
         await registerRoutes(server2);
 
@@ -281,7 +281,7 @@ describe('HTTP Server', () => {
             await sleep(50);
 
             // Create and try to start server on blocked port
-            const server = createServer();
+            const server = await createServer();
             await registerRoutes(server);
 
             let errorThrown = false;
@@ -343,7 +343,7 @@ describe('HTTP Server', () => {
             process.env.NODE_TEST_CONTEXT = '1';
             await sleep(50);
 
-            const server = createServer();
+            const server = await createServer();
             await registerRoutes(server);
 
             try {
@@ -360,7 +360,7 @@ describe('HTTP Server', () => {
     });
 
     test('should handle EACCES error', async () => {
-        const server = createServer();
+        const server = await createServer();
         await registerRoutes(server);
 
         const save = { ...process.env };
@@ -393,7 +393,7 @@ describe('HTTP Server', () => {
     });
 
     test('should handle plain Error objects', async () => {
-        const server = createServer();
+        const server = await createServer();
 
         // Test with invalid JSON to trigger error in JSON parser
         server.post('/test-error', async (request, reply) => {
@@ -414,7 +414,7 @@ describe('HTTP Server', () => {
     });
 
     test('should handle unknown error types', async () => {
-        const server = createServer();
+        const server = await createServer();
 
         // Register a route that throws a non-Error object
         server.get('/test-unknown-error', async (_request, _reply) => {
@@ -432,7 +432,7 @@ describe('HTTP Server', () => {
     });
 
     test('should format error messages for various error codes', async () => {
-        const server = createServer();
+        const server = await createServer();
         await registerRoutes(server);
 
         // Test that server was created successfully
@@ -441,7 +441,7 @@ describe('HTTP Server', () => {
     });
 
     test('should parse port from environment variable', async () => {
-        const server = createServer();
+        const server = await createServer();
         await registerRoutes(server);
 
         const save = { ...process.env };
@@ -498,7 +498,7 @@ describe('HTTP Server', () => {
 
             await sleep(50);
 
-            const server = createServer();
+            const server = await createServer();
             await registerRoutes(server);
 
             try {
