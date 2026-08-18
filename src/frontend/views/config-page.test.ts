@@ -428,7 +428,7 @@ describe('Config Page Component (DOM Rendering)', () => {
         const server: MCPServerConfig = {
             name: 'sse-server',
             transport: 'sse',
-            url: 'https://api.example.com/sse',
+            url: '/sse',
             enabled: true,
         };
 
@@ -452,7 +452,12 @@ describe('Config Page Component (DOM Rendering)', () => {
 
         const row = document.querySelector('tr');
         assert.ok(row, 'Table row should exist');
-        assert.ok(row.textContent?.includes('https://api.example.com/sse'), 'Should display URL');
+
+        const code = row.querySelector('code');
+        assert.ok(code, 'Code element should exist');
+        const displayedValue = code.textContent?.trim();
+        assert.ok(displayedValue !== undefined, 'Should have displayed text');
+        assert.equal(displayedValue, '/sse', 'Should display URL');
     });
 
     test('should update state when add server button is clicked', () => {

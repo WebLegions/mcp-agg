@@ -7,15 +7,17 @@
  * - npx create-fastify-bun-starter [project-name]
  */
 
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
+import { pathToFileURL } from 'node:url';
 import { promisify, styleText } from 'node:util';
 
-const execAsync = promisify(exec);
+const execAsync = promisify(execFile);
 
 const REPO_URL = 'https://github.com/eram/fastify-bun-starter.git';
+const TEMPORARY_CLONE_DIR = '.mcp-agg-template';
 
 // Color helpers using styleText
 function success(...args) {
@@ -69,6 +71,15 @@ function isDirectoryEmpty(dirPath) {
     return files.length === 0;
 }
 
+export function sanitizeProjectName(projectName) {
+    return path.basename(projectName).replace(/[^a-zA-Z0-9._-]/g, '-').replace(/^-+|-+$/g, '') || 'my-fastify-app';
+}
+
+export function resolveSafeTargetDir(cwdPath, projectName) {
+    const safeName = sanitizeProjectName(projectName);
+    return path.resolve(cwdPath, safeName);
+}
+
 async function main() {
     console.log('');
     info('='.repeat(60));
@@ -84,7 +95,8 @@ async function main() {
         projectName = await prompt('Project name', 'my-fastify-app');
     }
 
-    const targetDir = path.resolve(process.cwd(), projectName);
+    projectName = sanitizeProjectName(projectName);
+    const targetDir = resolveSafeTargetDir(process.cwd(), projectName);
 
     // Check if directory exists and is not empty
     if (!isDirectoryEmpty(targetDir)) {
@@ -115,43 +127,50 @@ async function main() {
     try {
         // Clone the template repository
         info('Cloning template from GitHub...');
-        await execAsync(`git clone --depth 1 ${REPO_URL} "${targetDir}"`, {
-            stdio: 'inherit',
-        });
+        if (!targetDir.startsWith(process.cwd())) {
+            throw new Error('Target directory must stay within the current working directory');
+        }
+
+        const temporaryCloneDir = path.join(process.cwd(), TEMPORARY_CLONE_DIR);
+        fs.rmSync(temporaryCloneDir, { recursive: true, force: true });
+
+        const cloneArgs = ['clone', '--depth', '1', REPO_URL, path.join(process.cwd(), TEMPORARY_CLONE_DIR)];
+        await execAsync('git', cloneArgs, { stdio: 'inherit' });
+
+        fs.rmSync(targetDir, { recursive: true, force: true });
+        fs.renameSync(temporaryCloneDir, targetDir);
         dim('  Template cloned successfully');
 
         // Remove .git directory
         info('Cleaning up template metadata...');
         const gitDir = path.join(targetDir, '.git');
-        if (fs.existsSync(gitDir)) {
-            fs.rmSync(gitDir, { recursive: true, force: true });
-        }
+        fs.rmSync(gitDir, { recursive: true, force: true });
         dim('  Removed .git directory');
 
         // Update package.json with user's configuration
         info('Configuring package.json...');
         const packageJsonPath = path.join(targetDir, 'package.json');
-        if (fs.existsSync(packageJsonPath)) {
-            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-            packageJson.name = projectName;
-            packageJson.version = version;
-            packageJson.description = description;
-            if (author) {
-                packageJson.author = author;
-            }
-            packageJson.license = license;
-
-            // Remove template repository information
-            delete packageJson.repository;
-            delete packageJson.bugs;
-            delete packageJson.homepage;
-
-            // Remove the bin and files fields (not needed in cloned projects)
-            delete packageJson.bin;
-            delete packageJson.files;
-
-            fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+        const packageJsonText = fs.readFileSync(packageJsonPath, 'utf8');
+        const packageJson = JSON.parse(packageJsonText);
+        packageJson.name = projectName;
+        packageJson.version = version;
+        packageJson.description = description;
+        if (author) {
+            packageJson.author = author;
         }
+        packageJson.license = license;
+
+        // Remove template repository information
+        delete packageJson.repository;
+        delete packageJson.bugs;
+        delete packageJson.homepage;
+
+        // Remove the bin and files fields (not needed in cloned projects)
+        delete packageJson.bin;
+        delete packageJson.files;
+
+        fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+
         dim('  Updated package.json with your settings');
 
         // Update LICENSE file if needed
@@ -205,10 +224,10 @@ async function main() {
     }
 }
 
-main().catch((err) => {
-    console.log('');
-    error('Unexpected error:');
-    error(err.message);
-    console.log('');
-    process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    main().catch((err) => {
+        error('Error creating project:');
+        console.error(err);
+        process.exit(1);
+    });
+}

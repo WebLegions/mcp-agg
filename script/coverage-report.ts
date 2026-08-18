@@ -44,8 +44,9 @@ interface FileCoverage {
     funcsCov: number;
     uncovered: number[];
     ignored: boolean; // Has Istanbul ignore comment for entire file
+    ignoredLines: Set<number>; // Line numbers of ignored executable lines
     ignoredFuncs: Set<number>; // Line numbers of ignored function declarations
-    hasIgnoredLines: boolean; // Has some (not all) lines ignored
+    hasIgnoredLines: boolean; // Has some (but not all) lines ignored
 }
 
 interface FolderCoverage {
@@ -83,28 +84,34 @@ function parseLcov(lcovData: string): FileCoverage[] {
         branchesCov: 0,
         funcsCov: 0,
         ignored: false,
+        ignoredLines: new Set(),
         ignoredFuncs: new Set(),
         hasIgnoredLines: false,
     } as const;
     let file = empty;
-    let ignoredLines: Set<number> = new Set();
-    let ignoredFuncs: Set<number> = new Set();
 
     for (const line of lines) {
         if (line.startsWith('SF:')) {
             // Start of new file
-            file = { ...empty, uncovered: [], ignoredFuncs: new Set(), hasIgnoredLines: false }; // Create new array and set for each file
+            file = {
+                ...empty,
+                uncovered: [],
+                ignoredLines: new Set(),
+                ignoredFuncs: new Set(),
+                hasIgnoredLines: false,
+            }; // Create new array and set for each file
             file.path = normalizePath(line.substring(3));
             file.name = path.basename(file.path);
 
             // Load istanbul ignore comments for this file
             const absolutePath = join(cwd, file.path);
-            [ignoredLines, ignoredFuncs] = getIstanbulIgnored(absolutePath);
-            file.ignoredFuncs = ignoredFuncs;
+            const [currentIgnoredLines, currentIgnoredFuncs] = getIstanbulIgnored(absolutePath);
+            file.ignoredLines = currentIgnoredLines;
+            file.ignoredFuncs = currentIgnoredFuncs;
             // Set ignored property for this file (entire file ignored)
-            file.ignored = ignoredLines.has(-1);
+            file.ignored = currentIgnoredLines.has(-1);
             // Set hasIgnoredLines if there are some (but not all) lines ignored
-            file.hasIgnoredLines = !file.ignored && ignoredLines.size > 0;
+            file.hasIgnoredLines = !file.ignored && currentIgnoredLines.size > 0;
         } else if (line.startsWith('DA:')) {
             // Data about a line: DA:line,hitCount
             const parts = line.substring(3).split(',');
@@ -112,7 +119,7 @@ function parseLcov(lcovData: string): FileCoverage[] {
             const hits = Number.parseInt(parts[1], 10);
 
             // Skip istanbul ignored lines entirely
-            if (file.ignored || ignoredLines.has(lineNum)) {
+            if (file.ignored || file.ignoredLines.has(lineNum)) {
                 continue;
             }
 
@@ -337,6 +344,7 @@ function addMissingFilesToCoverage(coverageFiles: FileCoverage[]): FileCoverage[
             branchesCov: 0,
             uncovered: [1],
             ignored: isFullyIgnored,
+            ignoredLines: ignoredLines,
             ignoredFuncs: ignoredFuncs,
             hasIgnoredLines: !isFullyIgnored && ignoredLines.size > 0,
         });

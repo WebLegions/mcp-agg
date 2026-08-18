@@ -257,6 +257,24 @@ describe('Transpile endpoint', () => {
         assert.ok(res.headers['cache-control']?.includes('max-age'));
     });
 
+    test('should rate limit repeated transpile requests', async () => {
+        let rateLimited = false;
+
+        for (let i = 0; i < 1001; i++) {
+            const res = await app.inject({
+                method: 'GET',
+                url: '/app/components/theme-toggle/index.ts',
+            });
+
+            if (res.statusCode === 429) {
+                rateLimited = true;
+                break;
+            }
+        }
+
+        assert.equal(rateLimited, true, 'Should return 429 once the limit is exceeded');
+    });
+
     test('should return correct MIME type for TypeScript', async () => {
         const res = await app.inject({
             method: 'GET',

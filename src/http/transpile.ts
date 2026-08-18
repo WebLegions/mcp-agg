@@ -192,6 +192,12 @@ export function registerTranspile(app: FastifyInstance, localPath: string, remot
     app.get<FileServe>(
         `${remotePath}/*`,
         {
+            config: {
+                rateLimit: {
+                    max: 1000,
+                    timeWindow: '1 minute',
+                },
+            },
             schema: {
                 hide: true, // Exclude from Swagger documentation
             },
@@ -318,12 +324,27 @@ export async function registerEnvInject(app: FastifyInstance, filesToInject: str
             }
         };
 
+        const registerRoute = (path: string) => {
+            app.get(
+                path,
+                {
+                    config: {
+                        rateLimit: {
+                            max: 100,
+                            timeWindow: '1 minute',
+                        },
+                    },
+                },
+                handler,
+            );
+        };
+
         // Register handler for the file path
-        app.get(`/${file}`, handler);
+        registerRoute(`/${file}`);
 
         // If this is index.html, also register for root path
         if (file === 'index.html') {
-            app.get('/', handler);
+            registerRoute('/');
         }
     }
 }

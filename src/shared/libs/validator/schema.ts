@@ -126,12 +126,12 @@ export function toJsonSchema<T extends Record<string, Validator>>(
                 ...refs,
                 currentPath: [...opts.basePath, opts.definitionPath, name],
             };
-            $defs[name] = parseSchema(def, defRefs) ?? {};
+            $defs[name] = parseSchema(def, defRefs);
         }
     }
 
     // Parse main schema
-    const mainSchema = parseSchema(schema, refs) ?? {};
+    const mainSchema = parseSchema(schema, refs);
 
     // Build final schema
     let result: JsonSchema;

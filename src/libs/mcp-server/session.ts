@@ -3,6 +3,7 @@
  * Provides per-session state management for MCP connections
  */
 
+import { randomBytes } from 'node:crypto';
 import { createLogger } from '../../utils';
 import { MCPServer } from './server';
 import type { ServerInfo } from './types';
@@ -138,6 +139,6 @@ export class SessionStore {
      * Generate a unique session ID
      */
     private _generateSessionId(): string {
-        return `mcp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        return `mcp-${Date.now()}-${randomBytes(8).toString('hex')}`;
     }
 }

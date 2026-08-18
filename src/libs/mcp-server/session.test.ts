@@ -2,7 +2,7 @@
  * Tests for MCP session management
  */
 
-import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict';
+import { deepStrictEqual, match, ok, strictEqual } from 'node:assert/strict';
 import { beforeEach, describe, test } from 'node:test';
 import type { MCPServer } from './server';
 import { SessionStore } from './session';
@@ -205,6 +205,11 @@ describe('SessionStore', () => {
         const session = store.create({ name: 'test', version: '1.0.0' });
         ok(session.sessionId.startsWith('mcp-'), 'Session ID should start with "mcp-"');
         ok(session.sessionId.length > 10, 'Session ID should be reasonably long');
+    });
+
+    test('session ID uses a cryptographically secure random suffix', () => {
+        const session = store.create({ name: 'test', version: '1.0.0' });
+        match(session.sessionId, /^mcp-\d+-[a-f0-9]{16}$/);
     });
 
     test('multiple creates in rapid succession generate unique IDs', () => {
